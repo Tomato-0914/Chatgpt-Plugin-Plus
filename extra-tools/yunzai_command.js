@@ -55,6 +55,23 @@ function eventOk (loader, e, rule) {
   }
 }
 
+/** 插件监听的事件是否包含当前消息（与 Yunzai 一致，戳一戳等通知类插件不处理消息） */
+const pluginOk = (loader, e, item) => eventOk(loader, e, item?.plugin)
+
+/**
+ * 能匹配任意文字的规则（.*、空规则等）：AI 聊天、伪人、消息记录这类每条消息都要过一遍的插件。
+ * 以及能匹配任意 # 开头文字的通配规则。它们不是“命令”，搜索时会占满结果，执行时也可能被误触发，一律跳过
+ */
+const catchAll = reg => ['', '\u0000随机文字 zx7q', '#\u0000随机文字 zx7q'].some(text => reg.test(text))
+
+/** 规则是不是一条可调用的命令 */
+function commandRule (loader, e, item, rule) {
+  const reg = toReg(rule?.reg)
+  if (!reg || catchAll(reg)) return null
+  if (!pluginOk(loader, e, item) || !eventOk(loader, e, rule)) return null
+  return reg
+}
+
 /** 以当前用户的身份构造一条命令消息，回复照常发到当前会话 */
 function commandEvent (loader, e, command, onReply) {
   const desc = Object.getOwnPropertyDescriptors(e)
@@ -90,11 +107,11 @@ function search (loader, e, query) {
   for (const item of loader.priority) {
     if (isSelf(item) || !Array.isArray(item?.plugin?.rule)) continue
     for (const rule of item.plugin.rule) {
-      const reg = toReg(rule?.reg)
-      if (!reg || !allowed(e, rule) || !eventOk(loader, e, rule)) continue
+      const reg = commandRule(loader, e, item, rule)
+      if (!reg || !allowed(e, rule)) continue
       const pattern = readable(reg)
       const exact = reg.test(query)
-      const text = `${pattern}\n${item.name || ''}\n${item.plugin?.dsc || ''}\n${rule.fnc || ''}`.toLowerCase()
+      const text = `${pattern}\n${item.name || ''}\n${item.plugin?.dsc || ''}\n${rule.fnc || ''}\n${item.key || ''}`.toLowerCase()
       if (!exact && !text.includes(keyword)) continue
       found.push({ exact, priority: Number(item.priority) || 0, line: `【${item.name || '未知插件'}】${pattern}` })
     }
@@ -119,8 +136,8 @@ async function execute (loader, e, command) {
   for (const item of loader.priority) {
     if (isSelf(item) || !Array.isArray(item?.plugin?.rule)) continue
     for (const rule of item.plugin.rule) {
-      const reg = toReg(rule?.reg)
-      if (!reg || !reg.test(ce.msg) || !eventOk(loader, ce, rule)) continue
+      const reg = commandRule(loader, ce, item, rule)
+      if (!reg || !reg.test(ce.msg)) continue
       matched = true
       if (!allowed(ce, rule)) return `没有权限执行这条命令（需要 ${rule.permission} 权限）`
       const plugin = Object.assign(new item.class(ce), { e: ce })

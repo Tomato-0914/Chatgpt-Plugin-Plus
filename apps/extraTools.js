@@ -164,9 +164,22 @@ export class ChatGPTExtraTools extends plugin {
           reg: `^${ChatGPTConfig.basic.commandPrefix}同步工具$`,
           fnc: 'sync',
           permission: 'master'
+        },
+        {
+          // 风险工具（群管、shell 等）由非主人发起时，主人用这个命令确认或拒绝
+          reg: '^#?(确认|拒绝)\\s*([0-9a-fA-F]{4})$',
+          fnc: 'approve',
+          permission: 'master'
         }
       ]
     })
+  }
+
+  async approve (e) {
+    const [, action, code] = e.msg.match(/^#?(确认|拒绝)\s*([0-9a-fA-F]{4})$/)
+    const approval = await import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
+    await e.reply(await approval.decide(code, action === '确认'))
+    return true
   }
 
   async sync (e) {
