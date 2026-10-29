@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 import { Chaite } from 'chaite'
 import ChatGPTConfig from '../config/config.js'
 
@@ -128,6 +129,11 @@ function summary ({ tools, processors }) {
 
 const changed = ({ tools, processors }) =>
   [tools, processors].some(r => r.added.length || r.updated.length || r.failed.length)
+
+// 启动提醒的定时检查（extra-tools/_reminders.js），重启前设置的提醒继续有效
+import(pathToFileURL(path.join(TOOLS_DIR, '_reminders.js')).href)
+  .then(reminders => reminders.start())
+  .catch(err => logger.error('[扩展工具] 提醒启动失败', err))
 
 // 启动时等 chaite 初始化完成后同步一次
 ;(async () => {
