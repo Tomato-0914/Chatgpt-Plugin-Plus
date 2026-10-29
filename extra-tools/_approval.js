@@ -6,6 +6,7 @@
  *     5 分钟内没有确认自动作废
  *   - 官方机器人的申请消息带「确认」「拒绝」两个回调按钮，按钮只允许主人点；按钮里带着这条申请的编号，
  *     有多条申请时点哪条的按钮就处理哪条
+ *   - 只 @（私聊时只私信）第一个主人，避免打扰所有主人；所有主人都可以确认、点按钮
  * 执行的内容在申请时就已经确定，确认时不能被换成别的。确认命令由 apps/extraTools.js 处理。
  * 以 _ 开头，不会被当成工具登记。
  */
@@ -72,12 +73,13 @@ export async function guard (e, { title, run }) {
 
   const text = `【需要主人确认】${requester} 想让我：${title}\n回复「#确认」或 Y 执行，「#拒绝」或 N 取消，5 分钟内有效`
   try {
+    const first = asId(list[0])
     if (e.isGroup || e.group_id) {
-      await e.reply([...list.slice(0, 3).flatMap(qq => [{ type: 'at', qq: asId(qq) }, ' ']), text, ...buttons(e, id, list)])
-    } else if (typeof globalThis.Bot?.sendMasterMsg === 'function') {
-      await globalThis.Bot.sendMasterMsg(text)
+      await e.reply([{ type: 'at', qq: first }, ' ', text, ...buttons(e, id, list)])
     } else {
-      await e.reply(text)
+      const friend = globalThis.Bot?.pickFriend?.(first)
+      if (typeof friend?.sendMsg === 'function') await friend.sendMsg(text)
+      else await e.reply(text)
     }
   } catch (err) {
     pending.delete(id)
