@@ -10,14 +10,15 @@ export class FileEditTool extends CustomTool {
 
   function = {
     name: 'file_edit',
-    description: '修改工作目录里文本文件的一部分：把 old_text 原样替换成 new_text。old_text 要从文件里原样复制（不含行号），' +
-      '且在文件里只出现一次；要全部替换时设 replace_all。改之前不确定内容时先用 file_read 查看。',
+    description: '修改文本文件的一部分：把 old_text 原样替换成 new_text。old_text 要从文件里原样复制（不含行号），' +
+      '且在文件里只出现一次；要全部替换时设 replace_all。改之前不确定内容时先用 file_read 查看。' +
+      'root=yunzai 可以改框架里的文件（仅主人），改之前自动备份；打码成 *** 的密钥行不能修改。',
     parameters: {
       type: 'object',
       properties: {
         path: {
           type: 'string',
-          description: '相对工作目录的文件路径'
+          description: '相对根目录的文件路径'
         },
         old_text: {
           type: 'string',
@@ -30,29 +31,38 @@ export class FileEditTool extends CustomTool {
         replace_all: {
           type: 'boolean',
           description: '替换所有出现的地方，默认 false'
-        }
+        },
+        root: ws.ROOT_PARAM
       },
       required: ['path', 'old_text', 'new_text']
     }
   }
 
-  async run (args) {
+  async run (args, context) {
     try {
-      const file = ws.resolvePath(args.path)
-      if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return `文件不存在：${ws.display(file)}`
+      const s = ws.scope(context?.getEvent?.(), args.root)
+      const file = ws.resolvePath(args.path, s)
+      const name = ws.display(file, s)
+      if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return `文件不存在：${name}`
       const buffer = fs.readFileSync(file)
       if (ws.isBinary(buffer)) return '二进制文件不能编辑'
       const text = buffer.toString('utf8')
       const oldText = String(args.old_text ?? '')
       const newText = String(args.new_text ?? '')
       if (!oldText) return 'old_text 不能为空；要整个改写请用 file_write'
+      if (s.yunzai && newText.includes('***')) return 'new_text 里有 ***（打码后的密钥），不能写进框架文件'
       const count = text.split(oldText).length - 1
-      if (!count) return '文件里没有找到 old_text，请先用 file_read 查看原文后原样复制'
+      if (!count) {
+        return s.yunzai && oldText.includes('***')
+          ? 'old_text 里有打码的密钥（***），和真实文件对不上；请只选不含密钥的部分来修改'
+          : '文件里没有找到 old_text，请先用 file_read 查看原文后原样复制'
+      }
       if (count > 1 && !args.replace_all) return `old_text 在文件里出现了 ${count} 次，请多带一些上下文让它唯一，或设置 replace_all`
       const result = args.replace_all ? text.split(oldText).join(newText) : text.replace(oldText, () => newText)
       if (Buffer.byteLength(result) > ws.LIMITS.write) return `修改后文件会超过 ${ws.formatSize(ws.LIMITS.write)}，已取消`
+      const backup = s.yunzai ? ws.backup(file) : ''
       fs.writeFileSync(file, result)
-      return `已修改 ${ws.display(file)}，替换了 ${args.replace_all ? count : 1} 处`
+      return `已修改 ${name}，替换了 ${args.replace_all ? count : 1} 处${backup ? '（原文件已备份，可用 file_restore 还原）' : ''}`
     } catch (err) {
       return ws.errorText(err)
     }
