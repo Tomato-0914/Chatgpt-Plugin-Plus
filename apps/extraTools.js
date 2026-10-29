@@ -12,6 +12,7 @@ import ChatGPTConfig from '../config/config.js'
  * 并全部放进“扩展工具”工具组；在面板的预设里勾选这个工具组即可使用。
  * 启动时自动同步一次（代码有变化才更新），也可以发送 #chatgpt同步工具 手动同步。
  * 修改工具请改 extra-tools 里的文件，在面板里改的代码会在下次同步时被覆盖。
+ * 以 _ 开头的文件是工具共用的辅助模块，不登记为工具。
  */
 const TOOLS_DIR = path.resolve('./plugins/chatgpt-plugin/extra-tools')
 const GROUP_NAME = '扩展工具'
@@ -38,7 +39,7 @@ async function syncExtraTools () {
   const result = { added: [], updated: [], unchanged: [], failed: [] }
   const existing = await toolsManager.listInstances()
   const ids = []
-  for (const file of fs.readdirSync(TOOLS_DIR).filter(f => f.endsWith('.js')).sort()) {
+  for (const file of fs.readdirSync(TOOLS_DIR).filter(f => f.endsWith('.js') && !f.startsWith('_')).sort()) {
     const code = fs.readFileSync(path.join(TOOLS_DIR, file), 'utf8')
     const name = toolName(code)
     if (!name) {
