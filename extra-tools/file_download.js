@@ -43,7 +43,8 @@ export class FileDownloadTool extends CustomTool {
 
   function = {
     name: 'file_download',
-    description: '把网络上的文件下载到工作目录，之后可以用 file_read 查看或 file_send 发送。',
+    description: '把网络上的文件下载到工作目录，之后可以用 file_read 查看或 file_send 发送。' +
+      '主人可以用 root=yunzai 下载到框架目录（如插件目录），覆盖已有文件前会自动备份。',
     parameters: {
       type: 'object',
       properties: {
@@ -53,18 +54,20 @@ export class FileDownloadTool extends CustomTool {
         },
         path: {
           type: 'string',
-          description: '保存到工作目录里的路径；以 / 结尾或不填时按原文件名保存到该目录（默认根目录）'
-        }
+          description: '保存路径（相对根目录）；以 / 结尾或不填时按原文件名保存到该目录（默认根目录）'
+        },
+        root: ws.ROOT_PARAM
       },
       required: ['url']
     }
   }
 
-  async run (args) {
+  async run (args, context) {
     const url = String(args.url || '').trim()
     if (!/^https?:\/\//i.test(url)) return '网址必须以 http:// 或 https:// 开头'
     let tmp
     try {
+      const s = ws.scope(context?.getEvent?.(), args.root)
       const target = String(args.path || '').trim()
       const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120000) })
       if (!res.ok || !res.body) return `下载失败：HTTP ${res.status}`
@@ -72,9 +75,9 @@ export class FileDownloadTool extends CustomTool {
       if (length > ws.LIMITS.download) return `文件有 ${ws.formatSize(length)}，超过 ${ws.formatSize(ws.LIMITS.download)}，已取消`
 
       const file = !target || target.endsWith('/')
-        ? ws.resolvePath(path.posix.join(target || '.', guessName(res, url)))
-        : ws.resolvePath(target)
-      if (fs.existsSync(file) && fs.statSync(file).isDirectory()) return `${ws.display(file)} 是目录`
+        ? ws.resolvePath(path.posix.join(target || '.', guessName(res, url)), s)
+        : ws.resolvePath(target, s)
+      if (fs.existsSync(file) && fs.statSync(file).isDirectory()) return `${ws.display(file, s)} 是目录`
       fs.mkdirSync(path.dirname(file), { recursive: true })
 
       // 先写临时文件，超过大小上限或中途失败时不留下半个文件
@@ -90,9 +93,10 @@ export class FileDownloadTool extends CustomTool {
       } finally {
         await new Promise(resolve => out.end(resolve))
       }
+      const backup = s.yunzai ? ws.backup(file) : ''
       fs.renameSync(tmp, file)
       tmp = undefined
-      return `已下载到 ${ws.display(file)}（${ws.formatSize(size)}）`
+      return `已下载到 ${ws.display(file, s)}（${ws.formatSize(size)}）${backup ? '，原文件已备份，可用 file_restore 还原' : ''}`
     } catch (err) {
       return err.name === 'TimeoutError' ? '下载失败：请求超时' : ws.errorText(err)
     } finally {

@@ -17,18 +17,20 @@ export class FileSendTool extends CustomTool {
 
   function = {
     name: 'file_send',
-    description: '把工作目录里的文件作为文件消息发到当前聊天（群文件或私聊文件）。生成或下载好文件、用户要求发文件时调用。',
+    description: '把文件作为文件消息发到当前聊天（群文件或私聊文件）。生成或下载好文件、用户要求发文件时调用。' +
+      '框架目录（root=yunzai）里的文件只能由主人在私聊里发送，避免配置原文发到群里。',
     parameters: {
       type: 'object',
       properties: {
         path: {
           type: 'string',
-          description: '相对工作目录的文件路径'
+          description: '相对根目录的文件路径'
         },
         name: {
           type: 'string',
           description: '发送时显示的文件名，默认用原文件名'
-        }
+        },
+        root: ws.ROOT_PARAM
       },
       required: ['path']
     }
@@ -38,8 +40,10 @@ export class FileSendTool extends CustomTool {
     const e = context?.getEvent?.()
     if (typeof e?.reply !== 'function') return '当前没有可用的聊天，无法发送文件'
     try {
-      const file = ws.resolvePath(args.path)
-      if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return `文件不存在：${ws.display(file)}`
+      const s = ws.scope(e, args.root)
+      if (s.yunzai && (e.isGroup || e.group_id)) return '框架目录里的文件只能在私聊里发送（可能含有密钥），请私聊机器人再发'
+      const file = ws.resolvePath(args.path, s)
+      if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return `文件不存在：${ws.display(file, s)}`
       const name = String(args.name || '').replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || path.basename(file)
       const ret = await e.reply({ type: 'file', file, name })
       if (!sent(ret)) {
