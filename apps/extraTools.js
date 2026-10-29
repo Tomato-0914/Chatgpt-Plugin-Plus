@@ -21,6 +21,8 @@ const PLUGIN_DIR = path.resolve('./plugins/chatgpt-plugin')
 const TOOLS_DIR = path.join(PLUGIN_DIR, 'extra-tools')
 const PROCESSORS_DIR = path.join(PLUGIN_DIR, 'extra-processors')
 const GROUP_NAME = '扩展工具'
+/** 主人确认 / 拒绝风险操作：#确认、#拒绝、yes / no、Y / N，按钮回调后面带申请编号 */
+const APPROVE_REG = /^(#确认|#拒绝|#?yes|#?no|#?y|#?n)(?:\s+([0-9a-f]{6}))?$/i
 
 /** 取代码里 name = 'xxx' 的名字（与 chaite 的 extractClassName 规则一致） */
 function codeName (code) {
@@ -166,19 +168,23 @@ export class ChatGPTExtraTools extends plugin {
           permission: 'master'
         },
         {
-          // 风险工具（群管、shell 等）由非主人发起时，主人用这个命令确认或拒绝
-          reg: '^#?(确认|拒绝)\\s*([0-9a-fA-F]{4})$',
-          fnc: 'approve',
-          permission: 'master'
+          // 风险工具（群管、shell 等）由非主人发起时，主人用这个确认或拒绝；按钮回调会带上申请编号。
+          // 不设 permission：群友随口说 “y” 时不能回 “暂无权限”，非主人或没有待确认的申请时直接放行
+          reg: APPROVE_REG,
+          fnc: 'approve'
         }
       ]
     })
   }
 
   async approve (e) {
-    const [, action, code] = e.msg.match(/^#?(确认|拒绝)\s*([0-9a-fA-F]{4})$/)
+    if (!e.isMaster) return false
+    const [, word, id] = String(e.msg || '').trim().match(APPROVE_REG) || []
+    if (!word) return false
     const approval = await import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
-    await e.reply(await approval.decide(code, action === '确认'))
+    const text = await approval.decide(e, /^(#确认|#?yes|#?y)$/i.test(word), id)
+    if (text === null) return false
+    await e.reply(text)
     return true
   }
 
