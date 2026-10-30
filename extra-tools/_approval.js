@@ -24,6 +24,9 @@ async function masters (e) {
   return [...new Set(list.map(String))].filter(id => id && id !== 'stdin')
 }
 
+/** 主人列表（other.yaml 里当前机器人的 master 和 masterQQ，第一个为主要的主人） */
+export const masterList = e => masters(e)
+
 /** 是否为主人（工具里判断操作对象是不是主人时用） */
 export async function isMaster (e, userId) {
   return (await masters(e)).includes(String(userId))
