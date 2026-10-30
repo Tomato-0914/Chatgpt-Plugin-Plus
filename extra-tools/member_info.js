@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { CustomTool } from 'chaite'
 
 const chat = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_chat.js')).href)
+const { members } = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_group.js')).href)
 
 const ROLE = { owner: '群主', admin: '管理员', member: '群员' }
 const SEX = { male: '男', female: '女' }
@@ -23,19 +24,6 @@ function formatInfo (uid, info) {
     ['最后发言', time(info.last_sent_time)]
   ].filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 0)
   return lines.map(([k, v]) => `${k}：${v}`).join('\n')
-}
-
-/** 群成员列表：优先 getMemberMap（官方机器人由野生号补全），没有时用 getMemberList */
-async function members (group) {
-  if (typeof group?.getMemberMap === 'function') {
-    const map = await group.getMemberMap()
-    return [...map.entries()].map(([id, info]) => ({ user_id: id, ...info }))
-  }
-  if (typeof group?.getMemberList === 'function') {
-    const list = await group.getMemberList()
-    return Array.isArray(list) ? list.map(i => (typeof i === 'object' ? i : { user_id: i })) : []
-  }
-  return []
 }
 
 export class MemberInfoTool extends CustomTool {
