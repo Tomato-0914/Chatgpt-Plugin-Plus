@@ -227,7 +227,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 43 | `at_role` |  | 按角色随机@群成员。 | high |  |
 | 44 | `random_at` |  | 随机@群成员。 | high |  |
 | 45 | `get_chat_history` | `search_chat_history` | 获取聊天历史记录。 | low | ✅ |
-| 46 | `recall_message` | `group_admin`（recall） | 撤回消息（仅限2分钟内的消息） | 危险 | ✅ |
+| 46 | `recall_message` | `group_admin`（recall） | 撤回消息（仅限2分钟内的消息） | 危险 | 🆕 |
 | 47 | `get_forward_msg` |  | 获取合并转发消息的完整内容。 | low |  |
 | 48 | `deep_parse_message` |  | 深度解析消息内容。 | low |  |
 | 49 | `send_forward_msg` |  | 【统一】发送合并转发消息。 | high |  |

@@ -7,21 +7,110 @@ const chat = await import(pathToFileURL(path.resolve(dir, '_chat.js')).href)
 const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).href)
 
 const MAX_MUTE_MINUTES = 30 * 24 * 60
+const MAX_RECALL = 10
+/** 撤回时往前翻多少条群消息来定位要撤的消息 */
+const RECALL_SCAN = 200
 const NEEDS_USER = new Set(['mute', 'unmute', 'kick', 'set_card', 'set_title'])
 
-/** 执行群管理的机器人：官方机器人一般不是管理员，优先用同群的野生号 */
+/** 常见错误码换成能看懂的说明 */
+const ERRORS = [
+  [/NOT_GROUP_ADMIN|not.*admin|权限不足|无权限|permission/i, '机器人不是群管理员'],
+  [/40062003/, '官方机器人只能撤回自己发的消息'],
+  [/OWNER|群主/i, '对方是群主或管理员，机器人没有权限']
+]
+const explain = text => {
+  const hit = ERRORS.find(([re]) => re.test(text))
+  return hit ? `${hit[1]}（${text}）` : text
+}
+
+/** 执行群管理的机器人：官方机器人一般不是管理员，也拉不到群消息记录，优先用同群的野生号 */
 function adminBot (e) {
   if (chat.isWildBot(e.bot)) return e.bot
   return chat.wildInGroup(e.group_id) || e.bot
 }
 
-/** OneBot 返回 { status: 'failed' } 或抛错都算失败 */
-async function call (fn) {
-  const ret = await fn()
-  if (ret?.status === 'failed' || (ret?.retcode && ret.retcode !== 0)) {
-    throw new Error(ret.wording || ret.message || ret.msg || `错误码 ${ret.retcode}`)
+/**
+ * 接口返回结果里的错误；没有错误时返回空串
+ * OneBot 失败时返回 { status: 'failed' }，撤回接口把每条的结果（含 Error）放进数组；
+ * 官方机器人撤不了别人的消息时返回 false
+ */
+function failure (ret) {
+  for (const item of Array.isArray(ret) ? ret : [ret]) {
+    if (item === false) return '官方机器人只能撤回自己发的消息（或消息 ID 无效）'
+    if (item instanceof Error) return explain(item.message)
+    if (item?.status === 'failed' || (item?.retcode && item.retcode !== 0)) {
+      return explain(item.wording || item.message || item.msg || `错误码 ${item.retcode}`)
+    }
   }
+  return ''
+}
+
+async function call (fn) {
+  let ret
+  try {
+    ret = await fn()
+  } catch (err) {
+    throw new Error(explain(err.message))
+  }
+  const error = failure(ret)
+  if (error) throw new Error(error)
   return ret
+}
+
+const preview = text => (text.length > 30 ? `${text.slice(0, 30)}…` : text) || '（无文字）'
+const norm = text => String(text ?? '').replace(/\s+/g, '')
+
+/**
+ * 找出要撤回的消息，返回 [{ id, desc }]
+ * 优先级：message_id → 引用的消息（“撤回这条”）→ 按 user_id / keyword 取最近的几条
+ */
+async function locateRecall (e, bot, gid, args) {
+  const id = String(args.message_id ?? '').trim()
+  if (id) {
+    if (chat.isWildBot(bot) && !/^-?\d+$/.test(id)) {
+      throw new Error('这是官方机器人的消息 ID，野生号用不了；请改为引用那条消息，或用 user_id / keyword 定位')
+    }
+    return [{ id, desc: `消息 ${id}` }]
+  }
+  if (!chat.isWildBot(bot)) throw new Error('这个群里没有野生号：官方机器人拉不到群消息记录，也只能撤回自己发的消息')
+
+  const describe = m => ({
+    id: m.message_id,
+    desc: `${m.sender?.card || m.sender?.nickname || ''}(${m.user_id ?? m.sender?.user_id})：${preview(chat.textOf(m))}`
+  })
+  const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
+  const keyword = String(args.keyword ?? '').trim().toLowerCase()
+
+  // 引用了一条消息并且没有给其他条件：撤回被引用的那条
+  if (e.source && !userId && !keyword) {
+    const reply = chat.isWildBot(e.bot) ? await e.getReply?.().catch(() => null) : null
+    if (reply?.message_id) return [describe(reply)]
+    // 官方机器人收到的引用只有发送时间和内容，到野生号的消息记录里按时间、内容找同一条
+    const history = await chat.fetchHistory(bot, gid, RECALL_SCAN)
+    const time = Number(e.source.time)
+    const text = norm(e.source.message).slice(0, 20)
+    const found = history
+      .filter(m => Math.abs(Number(m.time) - time) <= 120)
+      .filter(m => !text || norm(chat.textOf(m)).includes(text) || text.includes(norm(chat.textOf(m)).slice(0, 20)))
+      .sort((a, b) => Math.abs(Number(a.time) - time) - Math.abs(Number(b.time) - time))[0]
+    if (!found) throw new Error('没有在群消息记录里找到被引用的那条消息，可能太早了；请用 user_id / keyword 定位')
+    return [describe(found)]
+  }
+
+  if (!userId && !keyword) throw new Error('请引用要撤回的消息，或提供 user_id（谁发的）/ keyword（内容关键词）')
+  // user_id 写 bot 时撤回机器人自己发的消息（官方机器人和野生号）
+  const users = userId === 'bot' ? [String(e.self_id), String(bot.uin)] : userId ? [userId] : null
+  const count = Math.min(Math.max(Math.floor(Number(args.count) || 1), 1), MAX_RECALL)
+  const history = await chat.fetchHistory(bot, gid, RECALL_SCAN)
+  // 不撤回发起这次请求的那条消息，以及之后机器人发的提示
+  const before = Number(e.time) || Infinity
+  const list = history
+    .filter(m => Number(m.time) < before)
+    .filter(m => !users || users.includes(String(m.user_id ?? m.sender?.user_id)))
+    .filter(m => !keyword || chat.textOf(m).toLowerCase().includes(keyword))
+    .slice(-count)
+  if (!list.length) throw new Error(`最近 ${RECALL_SCAN} 条群消息里没有找到符合条件的消息`)
+  return list.map(describe)
 }
 
 export class GroupAdminTool extends CustomTool {
@@ -31,7 +120,9 @@ export class GroupAdminTool extends CustomTool {
     name: 'group_admin',
     description: '群管理：禁言、解除禁言、踢人、改群名片、设专属头衔、全员禁言、撤回消息。' +
       '主人要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人确认后才执行（告诉用户等主人确认即可）。' +
-      '需要机器人（同群的野生号）是管理员，头衔需要群主。不要对机器人自己操作。',
+      '需要机器人（同群的野生号）是管理员，头衔需要群主。不要对机器人自己操作。' +
+      '撤回：用户引用一条消息说“撤回这条”时直接 action=recall；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
+      '撤回机器人自己发的消息时 user_id 写 bot。不要编造 message_id。',
     parameters: {
       type: 'object',
       properties: {
@@ -42,7 +133,7 @@ export class GroupAdminTool extends CustomTool {
         },
         user_id: {
           type: 'string',
-          description: '操作对象的 QQ 号（mute / unmute / kick / set_card / set_title 必填）'
+          description: '操作对象的 QQ 号（mute / unmute / kick / set_card / set_title 必填）；recall 时表示撤回谁发的消息，写 bot 表示机器人自己'
         },
         minutes: {
           type: 'number',
@@ -52,9 +143,17 @@ export class GroupAdminTool extends CustomTool {
           type: 'string',
           description: 'set_card 的新名片，或 set_title 的头衔（为空表示清除）'
         },
+        keyword: {
+          type: 'string',
+          description: 'recall 时按消息内容里的关键词定位'
+        },
+        count: {
+          type: 'number',
+          description: 'recall 时撤回最近几条（按 user_id / keyword 筛选后），默认 1，最多 10'
+        },
         message_id: {
           type: 'string',
-          description: 'recall 要撤回的消息 ID'
+          description: 'recall 时直接指定消息 ID（只在确实知道 ID 时填写）'
         },
         reject_add: {
           type: 'boolean',
@@ -114,30 +213,52 @@ export class GroupAdminTool extends CustomTool {
         run = () => call(() => group.muteAll(action === 'mute_all'))
         break
       case 'recall': {
-        const id = String(args.message_id ?? '').trim()
-        if (!id) return '请提供要撤回的消息 ID'
-        title = `撤回消息 ${id}`
-        run = () => call(() => group.recallMsg(id))
+        if (typeof group.recallMsg !== 'function') return '当前机器人不支持撤回消息'
+        let targets
+        try {
+          targets = await locateRecall(e, bot, gid, args)
+        } catch (err) {
+          return `撤回失败：${err.message}`
+        }
+        // 申请确认时把要撤的消息列出来，主人看清楚再确认
+        title = targets.length === 1
+          ? `撤回消息 ${targets[0].desc}`
+          : `撤回 ${targets.length} 条消息：\n${targets.map((t, i) => `${i + 1}. ${t.desc}`).join('\n')}`
+        run = async () => {
+          const failed = []
+          for (const t of targets) {
+            try {
+              await call(() => group.recallMsg(t.id))
+            } catch (err) {
+              failed.push(err.message)
+            }
+          }
+          if (failed.length === targets.length) throw new Error(failed[0])
+          if (failed.length) return `撤回了 ${targets.length - failed.length} 条，${failed.length} 条失败：${failed[0]}`
+        }
         break
       }
       default:
         return 'action 不正确'
     }
     for (const method of [['mute', 'muteMember'], ['unmute', 'muteMember'], ['kick', 'kickMember'], ['set_card', 'setCard'],
-      ['set_title', 'setTitle'], ['mute_all', 'muteAll'], ['unmute_all', 'muteAll'], ['recall', 'recallMsg']]) {
+      ['set_title', 'setTitle'], ['mute_all', 'muteAll'], ['unmute_all', 'muteAll']]) {
       if (method[0] === action && typeof group[method[1]] !== 'function') return '当前机器人不支持这个群管理操作'
     }
 
+    // 结果里只带标题第一行（多条撤回时后面是消息列表）
+    const head = title.split('\n')[0].replace(/：$/, '')
     try {
       return await approval.guard(e, {
         title,
         run: async () => {
-          await run()
-          return `${title}：完成`
+          // 撤回部分失败时 run 返回说明文字；其他操作返回的是接口原始结果，不当作回复
+          const result = await run()
+          return typeof result === 'string' ? result : `${head}（已完成）`
         }
       })
     } catch (err) {
-      return `${title}失败：${err.message}（机器人可能不是管理员，或对方是管理员 / 群主）`
+      return `${head}（失败：${err.message}）`
     }
   }
 }
