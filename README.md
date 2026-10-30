@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 93 个，测试中 26 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 98 个，测试中 21 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -209,7 +209,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 25 | `get_short_url` |  | 生成短链接 | low |  |
 | 26 | `get_exchange_rate` | `market_price`（rate） | 查询实时汇率（中国银行外汇牌价，几分钟更新一次，含现汇/现钞买入卖出价和中行折算价），可换… | low | ✅ |
 | 27 | `get_gold_price` | `market_price`（metal） | 查询黄金、白银实时行情：上海金 Au99.99、Au(T+D)（元/克），伦敦金、纽约金（… | low | ✅ |
-| 28 | `get_oil_price` | `market_price`（oil） | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low | 🆕 |
+| 28 | `get_oil_price` | `market_price`（oil） | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low | ✅ |
 | 29 | `website` | `fetch_webpage` | 访问网页并获取内容（支持动态渲染） | low | ✅ |
 | 30 | `fetch_url` | `fetch_webpage` | 简单HTTP请求获取URL内容（不渲染JavaScript）。 | low | ✅ |
 | 31 | `get_current_context` | ikechan 内置群聊上下文 | 获取当前会话的上下文信息 | low |  |
@@ -255,15 +255,15 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 71 | `deserialize_message` |  | 反序列化消息数据。 | low |  |
 | 72 | `decode_protobuf` |  | 解码 Protobuf 数据。 | low |  |
 | 73 | `get_message_record` |  | 获取消息的完整记录数据（msgrecord）。 | low |  |
-| 74 | `get_user_info` | `user_profile` | 获取QQ用户的基本信息，包括昵称、头像、性别等。 | low | 🆕 |
+| 74 | `get_user_info` | `user_profile` | 获取QQ用户的基本信息，包括昵称、头像、性别等。 | low | ✅ |
 | 75 | `get_friend_list` |  | 获取机器人的好友列表 | low |  |
 | 76 | `send_like` | `send_like` | 给用户点赞（需要是好友） | high | ✅ |
-| 77 | `get_avatar` | `user_profile` | 获取用户或群头像URL | low | 🆕 |
+| 77 | `get_avatar` | `user_profile` | 获取用户或群头像URL | low | ✅ |
 | 78 | `get_sender_info` | `member_info` | 获取当前消息发送者的详细信息 | low | ✅ |
 | 79 | `search_friend` |  | 在好友列表中搜索用户（按昵称或备注） | low |  |
 | 80 | `check_is_friend` |  | 检查指定用户是否是机器人的好友 | low |  |
 | 81 | `get_bot_info` |  | 获取机器人自身的信息 | low |  |
-| 82 | `get_user_profile` | `user_profile` | 获取用户的详细资料（包括签名、等级等） | low | 🆕 |
+| 82 | `get_user_profile` | `user_profile` | 获取用户的详细资料（包括签名、等级等） | low | ✅ |
 | 83 | `get_group_info` | `group_info`（info） | 获取群组的基本信息，包括群名、成员数量等。 | low | ✅ |
 | 84 | `get_group_list` | `group_info`（list） | 获取机器人加入的群列表 | low | ✅ |
 | 85 | `get_group_member_list` | `group_members`（list） | 获取群成员列表 | low | ✅ |
@@ -434,7 +434,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 250 | `get_collection_list` |  | 获取QQ收藏列表 | low |  |
 | 251 | `get_login_info` |  | 获取机器人登录账号的信息（QQ号、昵称等） | low |  |
 | 252 | `get_bot_status` |  | 获取机器人运行状态 | low |  |
-| 253 | `get_stranger_info` | `user_profile` | 获取陌生人信息 | low | 🆕 |
+| 253 | `get_stranger_info` | `user_profile` | 获取陌生人信息 | low | ✅ |
 | 254 | `get_version_info` |  | 获取机器人版本信息 | low |  |
 | 255 | `get_online_clients` |  | 获取当前账号在线客户端列表 | low |  |
 | 256 | `set_qq_avatar` | `bot_account`（set_avatar） | 设置机器人头像（危险操作） | 危险 | 🆕 |
