@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 92 个，测试中 1 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 93 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -225,7 +225,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 41 | `reply_current_message` |  | 回复当前会话消息（自动判断群聊/私聊） | high |  |
 | 42 | `at_user` | `at_user` | 发送@用户消息。 | high | ✅ |
 | 43 | `at_role` |  | 按角色随机@群成员。 | high |  |
-| 44 | `random_at` | `send_message`（random_at） | 随机@群成员。 | high | 🆕 |
+| 44 | `random_at` | `send_message`（random_at） | 随机@群成员。 | high | ✅ |
 | 45 | `get_chat_history` | `search_chat_history` | 获取聊天历史记录。 | low | ✅ |
 | 46 | `recall_message` | `group_admin`（recall） | 撤回消息（仅限2分钟内的消息） | 危险 | ✅ |
 | 47 | `get_forward_msg` |  | 获取合并转发消息的完整内容。 | low |  |
