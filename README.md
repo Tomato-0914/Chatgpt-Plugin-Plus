@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 80 个，测试中 13 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 92 个，测试中 1 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -185,21 +185,21 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 1 | `get_current_time` | `get_current_time` | 获取当前时间和日期信息。 | low | ✅ |
 | 2 | `sleep` |  | 等待指定时间（用于需要延迟的场景） | low |  |
 | 3 | `echo` |  | 原样返回输入内容（用于测试或调试） | low |  |
-| 4 | `get_environment` | `system_info`（env） | 获取运行环境信息 | low | 🆕 |
-| 5 | `list_available_tools` | `system_info`（tools） | 列出所有可用的工具 | low | 🆕 |
-| 6 | `get_tool_info` | `system_info`（tool） | 获取指定工具的详细信息 | low | 🆕 |
+| 4 | `get_environment` | `system_info`（env） | 获取运行环境信息 | low | ✅ |
+| 5 | `list_available_tools` | `system_info`（tools） | 列出所有可用的工具 | low | ✅ |
+| 6 | `get_tool_info` | `system_info`（tool） | 获取指定工具的详细信息 | low | ✅ |
 | 7 | `get_lunar_date` | `get_current_time` | 获取农历日期 | low | ✅ |
-| 8 | `get_festival` | `festival` | 获取近期节日/节气信息 | low | 🆕 |
+| 8 | `get_festival` | `festival` | 获取近期节日/节气信息 | low | ✅ |
 | 9 | `format_number` |  | 格式化数字（添加千位分隔符、转中文等） | low |  |
 | 10 | `bing_search` | `web_search` | 使用Bing搜索引擎搜索内容（无需API Key） | low | ✅ |
 | 11 | `fetch_webpage` | `fetch_webpage` | 获取指定URL的网页内容并转换为Markdown格式 | low | ✅ |
 | 12 | `web_search` | `web_search` | 联网搜索网页，返回前几条结果的摘要，并读取前两条结果的网页正文。 | low | ✅ |
-| 13 | `search_wiki` | `encyclopedia`（wiki） | 搜索维基百科 | low | 🆕 |
+| 13 | `search_wiki` | `encyclopedia`（wiki） | 搜索维基百科 | low | ✅ |
 | 14 | `search_group_history` | `search_chat_history` | 搜索群聊历史记录中的关键词 | low | ✅ |
 | 15 | `translate` |  | 文本翻译 | low |  |
 | 16 | `get_weather` | `get_weather` | 获取天气信息。 | low | ✅ |
-| 17 | `get_ip_info` | `ip_info` | 查询IP地址信息 | low | 🆕 |
-| 18 | `search_baike` | `encyclopedia`（baike） | 搜索百度百科 | low | 🆕 |
+| 17 | `get_ip_info` | `ip_info` | 查询IP地址信息 | low | ✅ |
+| 18 | `search_baike` | `encyclopedia`（baike） | 搜索百度百科 | low | ✅ |
 | 19 | `get_hitokoto` |  | 获取一言（随机句子） | low |  |
 | 20 | `get_hot_search` | `hot_search` | 获取热搜榜单。 | low | ✅ |
 | 21 | `get_douyin_hot` | `hot_search` | 获取抖音热榜 | low | ✅ |
@@ -207,8 +207,8 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 23 | `get_joke` |  | 获取随机笑话 | low |  |
 | 24 | `get_morning_paper` | `daily_news` | 获取每天60秒读懂世界早报（当天新闻摘要）。 | low | ✅ |
 | 25 | `get_short_url` |  | 生成短链接 | low |  |
-| 26 | `get_exchange_rate` | `market_price`（rate） | 查询实时汇率（中国银行外汇牌价，几分钟更新一次，含现汇/现钞买入卖出价和中行折算价），可换… | low | 🆕 |
-| 27 | `get_gold_price` | `market_price`（metal） | 查询黄金、白银实时行情：上海金 Au99.99、Au(T+D)（元/克），伦敦金、纽约金（… | low | 🆕 |
+| 26 | `get_exchange_rate` | `market_price`（rate） | 查询实时汇率（中国银行外汇牌价，几分钟更新一次，含现汇/现钞买入卖出价和中行折算价），可换… | low | ✅ |
+| 27 | `get_gold_price` | `market_price`（metal） | 查询黄金、白银实时行情：上海金 Au99.99、Au(T+D)（元/克），伦敦金、纽约金（… | low | ✅ |
 | 28 | `get_oil_price` |  | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low |  |
 | 29 | `website` | `fetch_webpage` | 访问网页并获取内容（支持动态渲染） | low | ✅ |
 | 30 | `fetch_url` | `fetch_webpage` | 简单HTTP请求获取URL内容（不渲染JavaScript）。 | low | ✅ |
@@ -218,10 +218,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 34 | `get_reply_message` | ikechan 内置（引用消息自动带入） | 获取被引用/回复的消息内容。 | low |  |
 | 35 | `get_at_members` |  | 获取当前消息中@的成员列表 | low |  |
 | 36 | `get_group_context` | `search_chat_history` | 获取群聊上下文信息（仅群聊有效） | low | ✅ |
-| 37 | `send_to_master` | `send_message`（to_master） | 发送私聊消息给主人。 | high | 🆕 |
+| 37 | `send_to_master` | `send_message`（to_master） | 发送私聊消息给主人。 | high | ✅ |
 | 38 | `get_master_info` |  | 获取主人信息列表 | low |  |
-| 39 | `send_private_message` | `send_message`（private） | 发送私聊消息给指定用户。 | high | 🆕 |
-| 40 | `send_group_message` | `send_message`（group） | 发送群消息 | high | 🆕 |
+| 39 | `send_private_message` | `send_message`（private） | 发送私聊消息给指定用户。 | high | ✅ |
+| 40 | `send_group_message` | `send_message`（group） | 发送群消息 | high | ✅ |
 | 41 | `reply_current_message` |  | 回复当前会话消息（自动判断群聊/私聊） | high |  |
 | 42 | `at_user` | `at_user` | 发送@用户消息。 | high | ✅ |
 | 43 | `at_role` |  | 按角色随机@群成员。 | high |  |

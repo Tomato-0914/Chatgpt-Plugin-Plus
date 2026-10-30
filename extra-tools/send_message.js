@@ -111,12 +111,18 @@ async function random (e, args) {
   if (!list.length) return '没有符合条件的群成员可以 @'
   const picked = sample(list, Math.min(Math.max(Math.floor(Number(args.count)) || 1, 1), MAX_AT, list.length))
   const msg = []
-  for (const m of picked) msg.push({ type: 'at', qq: chat.asId(m.user_id) }, ' ')
+  const unbound = []
+  for (const m of picked) {
+    const { seg, real } = await chat.mention(e, m.user_id, grp.nameOf(m))
+    msg.push(seg)
+    if (real) msg.push(' ')
+    else unbound.push(grp.nameOf(m))
+  }
   const text = String(args.text ?? '').trim().slice(0, MAX_TEXT)
   if (text) msg.push(text)
   const ret = await e.reply(msg)
   if (!chat.sent(ret)) return `发送失败：${chat.failReason(ret)}`
-  return `已经随机 @ 了：${picked.map(grp.line).join('、')}，不需要再重复`
+  return `已经随机 @ 了：${picked.map(grp.line).join('、')}${unbound.length ? `（其中 ${unbound.join('、')} 没有绑定 QQ 号，官方机器人 @ 不到，只写了名字，对方收不到提醒）` : ''}，不需要再重复`
 }
 
 export class SendMessageTool extends CustomTool {
