@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 58 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 58 个，测试中 22 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -264,30 +264,30 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 80 | `check_is_friend` |  | 检查指定用户是否是机器人的好友 | low |  |
 | 81 | `get_bot_info` |  | 获取机器人自身的信息 | low |  |
 | 82 | `get_user_profile` |  | 获取用户的详细资料（包括签名、等级等） | low |  |
-| 83 | `get_group_info` |  | 获取群组的基本信息，包括群名、成员数量等。 | low |  |
-| 84 | `get_group_list` |  | 获取机器人加入的群列表 | low |  |
-| 85 | `get_group_member_list` |  | 获取群成员列表 | low |  |
+| 83 | `get_group_info` | `group_info`（info） | 获取群组的基本信息，包括群名、成员数量等。 | low | 🆕 |
+| 84 | `get_group_list` | `group_info`（list） | 获取机器人加入的群列表 | low | 🆕 |
+| 85 | `get_group_member_list` | `group_members`（list） | 获取群成员列表 | low | 🆕 |
 | 86 | `get_group_member_info` | `member_info` | 获取群成员的详细信息 | low | ✅ |
-| 87 | `get_current_group` |  | 获取当前会话所在群的详细信息 | low |  |
-| 88 | `get_group_admins` |  | 获取群管理员列表（包括群主） | low |  |
+| 87 | `get_current_group` | `group_info`（info） | 获取当前会话所在群的详细信息 | low | 🆕 |
+| 88 | `get_group_admins` | `group_members`（admins） | 获取群管理员列表（包括群主） | low | 🆕 |
 | 89 | `search_group_member` | `member_info`（search） | 在群成员中搜索用户（按昵称或群名片） | low | ✅ |
-| 90 | `get_group_notice` |  | 获取群公告列表 | low |  |
-| 91 | `check_in_group` |  | 检查用户是否在指定群内 | high |  |
-| 92 | `search_group` |  | 在已加入的群列表中搜索群组 | low |  |
-| 93 | `get_group_level` |  | 获取QQ群星级信息，包括群等级、活跃人数、群排名等。 | low |  |
-| 94 | `get_dragon_king` |  | 获取群龙王信息。 | low |  |
-| 95 | `get_sign_in_today` |  | 获取今日群打卡列表。 | low |  |
-| 96 | `get_speak_rank` |  | 获取群发言排行榜。 | low |  |
-| 97 | `get_group_data` |  | 获取群活跃数据统计，包括消息总数、活跃成员数、新增成员数、退群人数等。 | low |  |
-| 98 | `get_lucky_list` |  | 获取群幸运字符列表。 | low |  |
-| 99 | `draw_lucky` |  | 抽取幸运字符。 | high |  |
-| 100 | `equip_lucky` |  | 装备或更换幸运字符。 | high |  |
-| 101 | `switch_lucky` |  | 开启或关闭群幸运字符功能。 | high |  |
-| 102 | `get_inactive_members` |  | 获取群内不活跃成员列表。 | low |  |
-| 103 | `get_recent_join_members` |  | 获取最近入群的成员列表。 | low |  |
-| 104 | `get_group_honor` |  | 获取群荣誉信息，包括龙王、群聊之火、群聊炽焰、冒尖小春笋、快乐源泉等荣誉称号及获得者。 | low |  |
-| 105 | `get_group_stat` |  | 获取群成员统计信息，包括成员总数、群主数、管理员数、普通成员数，以及性别分布统计。 | low |  |
-| 106 | `get_random_group_member` |  | 随机抽取群成员，可用于随机点名、抽奖、随机@等场景。 | low |  |
+| 90 | `get_group_notice` | `group_info`（notice） | 获取群公告列表 | low | 🆕 |
+| 91 | `check_in_group` | `group_members`（check） | 检查用户是否在指定群内 | high | 🆕 |
+| 92 | `search_group` | `group_info`（list） | 在已加入的群列表中搜索群组 | low | 🆕 |
+| 93 | `get_group_level` | `group_activity`（level） | 获取QQ群星级信息，包括群等级、活跃人数、群排名等。 | low | 🆕 |
+| 94 | `get_dragon_king` | `group_activity`（honor） | 获取群龙王信息。 | low | 🆕 |
+| 95 | `get_sign_in_today` | `group_activity`（sign_in） | 获取今日群打卡列表。 | low | 🆕 |
+| 96 | `get_speak_rank` | `group_activity`（speak_rank） | 获取群发言排行榜。 | low | 🆕 |
+| 97 | `get_group_data` | `group_activity`（data） | 获取群活跃数据统计，包括消息总数、活跃成员数、新增成员数、退群人数等。 | low | 🆕 |
+| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | 🆕 |
+| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | 🆕 |
+| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | 🆕 |
+| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | 🆕 |
+| 102 | `get_inactive_members` | `group_members`（inactive） | 获取群内不活跃成员列表。 | low | 🆕 |
+| 103 | `get_recent_join_members` | `group_members`（recent_join） | 获取最近入群的成员列表。 | low | 🆕 |
+| 104 | `get_group_honor` | `group_activity`（honor） | 获取群荣誉信息，包括龙王、群聊之火、群聊炽焰、冒尖小春笋、快乐源泉等荣誉称号及获得者。 | low | 🆕 |
+| 105 | `get_group_stat` | `group_info`（stat） | 获取群成员统计信息，包括成员总数、群主数、管理员数、普通成员数，以及性别分布统计。 | low | 🆕 |
+| 106 | `get_random_group_member` | `group_members`（random） | 随机抽取群成员，可用于随机点名、抽奖、随机@等场景。 | low | 🆕 |
 | 107 | `parse_image` | ikechan 内置识图 | 解析消息中的图片，获取图片URL或base64数据 | low |  |
 | 108 | `generate_qrcode` |  | 生成二维码图片 | low |  |
 | 109 | `get_image_info` |  | 获取图片的基本信息（尺寸、格式等） | low |  |
