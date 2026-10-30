@@ -37,6 +37,9 @@ const chatOf = e => (e?.isGroup || e?.group_id ? `group:${e.group_id}` : 'privat
 
 const asId = id => (/^\d+$/.test(id) ? Number(id) : id)
 
+/** 申请内容（群友说的话）放进 Markdown 前转义会变成格式的字符，换行改成空格（都在行中间，括号、# 等不影响） */
+const md = text => String(text ?? '').replace(/([\\`*_[\]~|])/g, '\\$1').replace(/\s*\n\s*/g, ' ')
+
 function newId () {
   let id
   do id = crypto.randomBytes(3).toString('hex')
@@ -78,7 +81,12 @@ export async function guard (e, { title, run }) {
   try {
     const first = asId(list[0])
     if (e.isGroup || e.group_id) {
-      await e.reply([{ type: 'at', qq: first }, ' ', text, ...buttons(e, id, list)])
+      const btn = buttons(e, id, list)
+      // 官方机器人发 Markdown（带按钮），野生号发普通文字
+      const body = btn.length
+        ? { type: 'markdown', data: `\n**【需要主人确认】**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n点按钮，或回复「#确认」/ Y 执行、「#拒绝」/ N 取消，5 分钟内有效` }
+        : ` ${text}`
+      await e.reply([{ type: 'at', qq: first }, body, ...btn])
     } else {
       const friend = globalThis.Bot?.pickFriend?.(first)
       if (typeof friend?.sendMsg === 'function') await friend.sendMsg(text)

@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 93 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 93 个，测试中 26 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -209,7 +209,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 25 | `get_short_url` |  | 生成短链接 | low |  |
 | 26 | `get_exchange_rate` | `market_price`（rate） | 查询实时汇率（中国银行外汇牌价，几分钟更新一次，含现汇/现钞买入卖出价和中行折算价），可换… | low | ✅ |
 | 27 | `get_gold_price` | `market_price`（metal） | 查询黄金、白银实时行情：上海金 Au99.99、Au(T+D)（元/克），伦敦金、纽约金（… | low | ✅ |
-| 28 | `get_oil_price` |  | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low |  |
+| 28 | `get_oil_price` | `market_price`（oil） | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low | 🆕 |
 | 29 | `website` | `fetch_webpage` | 访问网页并获取内容（支持动态渲染） | low | ✅ |
 | 30 | `fetch_url` | `fetch_webpage` | 简单HTTP请求获取URL内容（不渲染JavaScript）。 | low | ✅ |
 | 31 | `get_current_context` | ikechan 内置群聊上下文 | 获取当前会话的上下文信息 | low |  |
@@ -228,16 +228,16 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 44 | `random_at` | `send_message`（random_at） | 随机@群成员。 | high | ✅ |
 | 45 | `get_chat_history` | `search_chat_history` | 获取聊天历史记录。 | low | ✅ |
 | 46 | `recall_message` | `group_admin`（recall） | 撤回消息（仅限2分钟内的消息） | 危险 | ✅ |
-| 47 | `get_forward_msg` |  | 获取合并转发消息的完整内容。 | low |  |
+| 47 | `get_forward_msg` | `forward_msg` | 获取合并转发消息的完整内容。 | low | 🆕 |
 | 48 | `deep_parse_message` |  | 深度解析消息内容。 | low |  |
 | 49 | `send_forward_msg` |  | 【统一】发送合并转发消息。 | high |  |
 | 50 | `resend_quoted_card` |  | 【推荐】重新发送引用消息中的卡片。 | high |  |
 | 51 | `mark_msg_as_read` |  | 标记消息为已读（NapCat扩展） | high |  |
-| 52 | `get_essence_msg_list` |  | 获取群精华消息列表 | low |  |
-| 53 | `set_essence_msg` |  | 设置群精华消息 | 危险 |  |
-| 54 | `delete_essence_msg` |  | 移除群精华消息 | 危险 |  |
+| 52 | `get_essence_msg_list` | `essence`（list） | 获取群精华消息列表 | low | 🆕 |
+| 53 | `set_essence_msg` | `essence`（set） | 设置群精华消息 | 危险 | 🆕 |
+| 54 | `delete_essence_msg` | `essence`（remove） | 移除群精华消息 | 危险 | 🆕 |
 | 55 | `poke_user` | `poke_user` | 戳一戳用户 | high | ✅ |
-| 56 | `set_msg_emoji_like` |  | 对消息发送表情回应（表情贴） | high |  |
+| 56 | `set_msg_emoji_like` | `emoji_reaction` | 对消息发送表情回应（表情贴） | high | 🆕 |
 | 57 | `get_msg` |  | 获取消息详情。 | low |  |
 | 58 | `send_raw_message` |  | 发送原始消息段数组。 | 危险 |  |
 | 59 | `send_card` |  | 【统一】发送卡片消息。 | high |  |
@@ -251,19 +251,19 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 67 | `send_pb_message` |  | 发送 Protobuf/OIDB/Uni/SSO 协议包，等同于 send_protoco… | 危险 |  |
 | 68 | `send_forward_direct` |  | 直接发送转发消息 | high |  |
 | 69 | `make_forward_msg` |  | 构造转发消息节点。 | high |  |
-| 70 | `extract_forward_data` |  | 提取合并转发消息的完整底层数据。 | low |  |
+| 70 | `extract_forward_data` | `forward_msg` | 提取合并转发消息的完整底层数据。 | low | 🆕 |
 | 71 | `deserialize_message` |  | 反序列化消息数据。 | low |  |
 | 72 | `decode_protobuf` |  | 解码 Protobuf 数据。 | low |  |
 | 73 | `get_message_record` |  | 获取消息的完整记录数据（msgrecord）。 | low |  |
-| 74 | `get_user_info` |  | 获取QQ用户的基本信息，包括昵称、头像、性别等。 | low |  |
+| 74 | `get_user_info` | `user_profile` | 获取QQ用户的基本信息，包括昵称、头像、性别等。 | low | 🆕 |
 | 75 | `get_friend_list` |  | 获取机器人的好友列表 | low |  |
 | 76 | `send_like` | `send_like` | 给用户点赞（需要是好友） | high | ✅ |
-| 77 | `get_avatar` |  | 获取用户或群头像URL | low |  |
+| 77 | `get_avatar` | `user_profile` | 获取用户或群头像URL | low | 🆕 |
 | 78 | `get_sender_info` | `member_info` | 获取当前消息发送者的详细信息 | low | ✅ |
 | 79 | `search_friend` |  | 在好友列表中搜索用户（按昵称或备注） | low |  |
 | 80 | `check_is_friend` |  | 检查指定用户是否是机器人的好友 | low |  |
 | 81 | `get_bot_info` |  | 获取机器人自身的信息 | low |  |
-| 82 | `get_user_profile` |  | 获取用户的详细资料（包括签名、等级等） | low |  |
+| 82 | `get_user_profile` | `user_profile` | 获取用户的详细资料（包括签名、等级等） | low | 🆕 |
 | 83 | `get_group_info` | `group_info`（info） | 获取群组的基本信息，包括群名、成员数量等。 | low | ✅ |
 | 84 | `get_group_list` | `group_info`（list） | 获取机器人加入的群列表 | low | ✅ |
 | 85 | `get_group_member_list` | `group_members`（list） | 获取群成员列表 | low | ✅ |
@@ -312,7 +312,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 128 | `search_music_qq` | `send_music` | 搜索QQ音乐并发送音乐卡片 | high | ✅ |
 | 129 | `search_emoji` | `search_image`（emoji） | 搜索表情包并发送 | high | ✅ |
 | 130 | `search_image_bing` | `search_image`（any） | 使用Bing搜索图片并发送 | high | ✅ |
-| 131 | `set_msg_reaction` |  | 对消息添加表情回应（贴表情），可从聊天记录的[消息ID:xxx]获取message_id | high |  |
+| 131 | `set_msg_reaction` | `emoji_reaction` | 对消息添加表情回应（贴表情），可从聊天记录的[消息ID:xxx]获取message_id | high | 🆕 |
 | 132 | `search_wallpaper` | `search_image`（wallpaper） | 搜索壁纸图片 | high | ✅ |
 | 133 | `bilibili_search` | `bilibili`（search） | 搜索B站视频并发送结果 | high | ✅ |
 | 134 | `github_repo_info` |  | 获取GitHub仓库的详细信息 | low |  |
@@ -349,17 +349,17 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 165 | `generate_password` |  | 生成随机密码 | low |  |
 | 166 | `dice_roll` |  | 掷骰子 | low |  |
 | 167 | `draw_lots` |  | 抽签/抽奖 | low |  |
-| 168 | `get_group_files` |  | 获取群文件列表 | low |  |
-| 169 | `get_file_url` |  | 获取群文件下载链接 | low |  |
+| 168 | `get_group_files` | `group_files`（list / search） | 获取群文件列表 | low | 🆕 |
+| 169 | `get_file_url` | `group_files`（url） | 获取群文件下载链接 | low | 🆕 |
 | 170 | `upload_group_file` | `file_send` | 上传文件到群（需要文件URL或本地路径） | high | ✅ |
-| 171 | `delete_group_file` |  | 删除群文件 | 危险 |  |
-| 172 | `create_group_folder` |  | 创建群文件夹 | high |  |
-| 173 | `get_group_file_system_info` |  | 获取群文件系统信息（用量、数量等） | low |  |
-| 174 | `get_group_root_files` |  | 获取群根目录文件列表 | low |  |
-| 175 | `get_group_files_by_folder` |  | 获取群子目录文件列表 | low |  |
-| 176 | `move_group_file` |  | 移动群文件到其他文件夹 | 危险 |  |
-| 177 | `rename_group_file` |  | 重命名群文件 | 危险 |  |
-| 178 | `delete_group_folder` |  | 删除群文件夹 | 危险 |  |
+| 171 | `delete_group_file` | `group_files`（delete） | 删除群文件 | 危险 | 🆕 |
+| 172 | `create_group_folder` | `group_files`（mkdir） | 创建群文件夹 | high | 🆕 |
+| 173 | `get_group_file_system_info` | `group_files`（info） | 获取群文件系统信息（用量、数量等） | low | 🆕 |
+| 174 | `get_group_root_files` | `group_files`（list） | 获取群根目录文件列表 | low | 🆕 |
+| 175 | `get_group_files_by_folder` | `group_files`（list） | 获取群子目录文件列表 | low | 🆕 |
+| 176 | `move_group_file` | `group_files`（move） | 移动群文件到其他文件夹 | 危险 | 🆕 |
+| 177 | `rename_group_file` | `group_files`（rename） | 重命名群文件 | 危险 | 🆕 |
+| 178 | `delete_group_folder` | `group_files`（rmdir） | 删除群文件夹 | 危险 | 🆕 |
 | 179 | `upload_private_file` | `file_send` | 上传私聊文件 | high | ✅ |
 | 180 | `get_private_file_url` |  | 获取私聊文件下载链接 | low |  |
 | 181 | `download_file` | `file_download` | 下载文件到插件受管临时目录。 | high | ✅ |
@@ -426,7 +426,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 242 | `get_qzone_feeds` |  | 获取QQ空间说说列表。 | low |  |
 | 243 | `like_qzone_post` |  | 点赞QQ空间说说。 | high |  |
 | 244 | `delete_qzone_mood` |  | 删除自己的QQ空间说说。 | 危险 |  |
-| 245 | `set_self_longnick` |  | 设置机器人的个性签名/个人说明 | high |  |
+| 245 | `set_self_longnick` | `bot_account`（set_signature） | 设置机器人的个性签名/个人说明 | high | 🆕 |
 | 246 | `friend_poke` |  | 戳一戳好友，兼容 icqq 和 NapCat/go-cqhttp | high |  |
 | 247 | `group_poke` |  | 在群里戳一戳某人，兼容 icqq 和 NapCat/go-cqhttp | high |  |
 | 248 | `get_profile_like` |  | 获取QQ资料卡点赞信息 | low |  |
@@ -434,10 +434,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 250 | `get_collection_list` |  | 获取QQ收藏列表 | low |  |
 | 251 | `get_login_info` |  | 获取机器人登录账号的信息（QQ号、昵称等） | low |  |
 | 252 | `get_bot_status` |  | 获取机器人运行状态 | low |  |
-| 253 | `get_stranger_info` |  | 获取陌生人信息 | low |  |
+| 253 | `get_stranger_info` | `user_profile` | 获取陌生人信息 | low | 🆕 |
 | 254 | `get_version_info` |  | 获取机器人版本信息 | low |  |
 | 255 | `get_online_clients` |  | 获取当前账号在线客户端列表 | low |  |
-| 256 | `set_qq_avatar` |  | 设置机器人头像（危险操作） | 危险 |  |
+| 256 | `set_qq_avatar` | `bot_account`（set_avatar） | 设置机器人头像（危险操作） | 危险 | 🆕 |
 | 257 | `get_model_show` |  | 获取机型显示信息 | low |  |
 | 258 | `get_self_info` |  | 获取机器人自身的完整信息（综合） | low |  |
 | 259 | `list_skills` | ikechan 内置 Skill | 列出所有可用的技能(skills)及其描述。 | low |  |
@@ -461,16 +461,16 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 277 | `set_group_special_title` | `group_admin`（set_title） | 设置群成员专属头衔，支持单个或批量设置（需要群主权限） | 危险 | ✅ |
 | 278 | `send_group_notice` |  | 发送群公告（需要管理员权限） | 危险 |  |
 | 279 | `delete_group_notice` |  | 删除群公告（需要管理员权限） | 危险 |  |
-| 280 | `set_group_add_request` |  | 处理加群申请 | 危险 |  |
+| 280 | `set_group_add_request` | QQBot-Plugin 入群申请（#QQBot入群申请） | 处理加群申请 | 危险 |  |
 | 281 | `set_friend_add_request` |  | 处理好友申请 | 危险 |  |
 | 282 | `get_group_muted_list` |  | 获取群禁言列表 | low |  |
-| 283 | `set_group_leave` |  | 退出群聊（需谨慎使用） | 危险 |  |
-| 284 | `delete_friend` |  | 删除好友（需谨慎使用） | 危险 |  |
+| 283 | `set_group_leave` | `bot_account`（quit_group） | 退出群聊（需谨慎使用） | 危险 | 🆕 |
+| 284 | `delete_friend` | `bot_account`（delete_friend） | 删除好友（需谨慎使用） | 危险 | 🆕 |
 | 285 | `set_group_portrait` |  | 设置群头像（需要管理员权限） | 危险 |  |
 | 286 | `get_group_at_all_remain` |  | 获取群@全体成员剩余次数 | low |  |
 | 287 | `set_group_anonymous_ban` |  | 禁言群匿名成员 | 危险 |  |
 | 288 | `set_group_anonymous` |  | 设置群匿名功能开关 | 危险 |  |
-| 289 | `get_group_system_msg` |  | 获取群系统消息（加群请求、邀请等） | low |  |
+| 289 | `get_group_system_msg` | QQBot-Plugin 入群申请（#QQBot入群申请） | 获取群系统消息（加群请求、邀请等） | low |  |
 | 290 | `execute_command` | `shell` | 执行 Shell 命令。 | 危险 | ✅ |
 | 291 | `get_system_info` | `shell` | 获取系统信息，包括操作系统、CPU、内存、磁盘等 | low | ✅ |
 | 292 | `get_process_info` | `shell` | 获取当前 Node.js 进程信息 | low | ✅ |

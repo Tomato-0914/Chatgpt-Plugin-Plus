@@ -115,3 +115,13 @@ export async function groupInfo (e, gid, current) {
   for (const src of sources) fill(info, src)
   return info
 }
+
+/** 发起请求的人在群里的身份（owner / admin / member）；查不到时为空串 */
+export async function requesterRole (e) {
+  if (e?.sender?.role) return e.sender.role
+  try {
+    return (await e?.group?.pickMember?.(chat.asId(e.user_id))?.getInfo?.())?.role || ''
+  } catch {
+    return ''
+  }
+}

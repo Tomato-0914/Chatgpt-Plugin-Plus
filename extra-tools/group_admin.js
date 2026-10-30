@@ -58,7 +58,6 @@ async function call (fn) {
 }
 
 const preview = text => (text.length > 30 ? `${text.slice(0, 30)}…` : text) || '（无文字）'
-const norm = text => String(text ?? '').replace(/\s+/g, '')
 
 /** 官方机器人的群对象（撤回官方机器人自己发的消息用，走官方的撤回接口） */
 const officialGroup = e => (chat.isWildBot(e.bot) ? null : e.bot?.pickGroup?.(e.group_id))
@@ -120,33 +119,20 @@ async function locateRecall (e, bot, gid, args) {
     desc: `${m.sender?.card || m.sender?.nickname || ''}(${m.user_id ?? m.sender?.user_id})：${preview(chat.textOf(m))}`
   })
 
-  // 引用了一条消息并且没有给其他条件：撤回被引用的那条
+  // 引用了一条消息并且没有给其他条件：撤回被引用的那条（官方机器人收到的引用到野生号的消息记录里找同一条）
   if (e.source && !userId && !keyword) {
-    const reply = chat.isWildBot(e.bot) ? await e.getReply?.().catch(() => null) : null
-    if (reply?.message_id) return { group, targets: [describe(reply)] }
-    // 官方机器人收到的引用只有发送时间和内容，到野生号的消息记录里按时间、内容找同一条
-    const history = await chat.fetchHistory(bot, gid, RECALL_SCAN)
-    const time = Number(e.source.time)
-    const text = norm(e.source.message).slice(0, 20)
-    const found = history
-      .filter(m => Math.abs(Number(m.time) - time) <= 120)
-      .filter(m => !text || norm(chat.textOf(m)).includes(text) || text.includes(norm(chat.textOf(m)).slice(0, 20)))
-      .sort((a, b) => Math.abs(Number(a.time) - time) - Math.abs(Number(b.time) - time))[0]
-    if (!found) throw new Error('没有在群消息记录里找到被引用的那条消息，可能太早了；请用 user_id / keyword 定位')
-    return { group, targets: [describe(found)] }
+    try {
+      return { group, targets: [describe(await chat.quotedMessage(e, bot, gid, { scan: RECALL_SCAN }))] }
+    } catch (err) {
+      throw new Error(`${err.message}；请用 user_id / keyword 定位`)
+    }
   }
 
   if (!userId && !keyword) throw new Error('请引用要撤回的消息，或提供 user_id（谁发的）/ keyword（内容关键词）')
   // user_id 写 bot 时撤回野生号自己发的消息（官方机器人的在前面已经处理）
   const users = userId === 'bot' ? [String(bot.uin)] : userId ? [userId] : null
-  const history = await chat.fetchHistory(bot, gid, RECALL_SCAN)
   // 不撤回发起这次请求的那条消息，以及之后机器人发的提示
-  const before = Number(e.time) || Infinity
-  const list = history
-    .filter(m => Number(m.time) < before)
-    .filter(m => !users || users.includes(String(m.user_id ?? m.sender?.user_id)))
-    .filter(m => !keyword || chat.textOf(m).toLowerCase().includes(keyword))
-    .slice(-count)
+  const list = await chat.recentMessages(e, bot, gid, { users, keyword, count, scan: RECALL_SCAN })
   if (!list.length) throw new Error(`最近 ${RECALL_SCAN} 条群消息里没有找到符合条件的消息`)
   return { group, targets: list.map(describe) }
 }
