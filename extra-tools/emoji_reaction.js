@@ -54,7 +54,7 @@ export class EmojiReactionTool extends CustomTool {
   function = {
     name: 'emoji_reaction',
     description: '给群消息贴表情回应（由同群的野生号贴）：给说话的人这条消息、引用的那条消息、或某人最近一条消息贴表情（add），也可以取消（remove）。' +
-      '想表达赞同、喜欢、哈哈等态度时可以用；表情传一个 emoji 字符（如 👍 ❤️ 😂 🎉）或 QQ 表情编号。',
+      '工具会自己读取引用的消息，看不到引用内容也直接调用。想表达赞同、喜欢、哈哈等态度时可以用；表情传一个 emoji 字符（如 👍 ❤️ 😂 🎉）或 QQ 表情编号。',
     parameters: {
       type: 'object',
       properties: {

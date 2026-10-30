@@ -85,7 +85,7 @@ export class ForwardMsgTool extends CustomTool {
   function = {
     name: 'forward_msg',
     description: '读取合并转发的聊天记录（群聊的聊天记录卡片）的完整内容，嵌套的聊天记录也会展开。' +
-      '用户引用一条聊天记录让你总结、看看说了什么时调用；没有引用时读群里最近的一条聊天记录。需要同群的野生号。',
+      '用户引用一条聊天记录让你总结、看看说了什么时调用（工具会自己读取引用，看不到内容也直接调用）；没有引用时读群里最近的一条聊天记录。需要同群的野生号。',
     parameters: {
       type: 'object',
       properties: {},

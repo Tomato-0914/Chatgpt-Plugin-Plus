@@ -145,7 +145,7 @@ export class GroupAdminTool extends CustomTool {
     description: '群管理：禁言、解除禁言、踢人、改群名片、设专属头衔、全员禁言、撤回消息。' +
       '主人要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人确认后才执行（告诉用户等主人确认即可）。' +
       '需要机器人（同群的野生号）是管理员，头衔需要群主。不要对机器人自己操作。' +
-      '撤回：用户引用一条消息说“撤回这条”时直接 action=recall；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
+      '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
       '撤回机器人自己发的消息时 user_id 写 bot（官方机器人自己的消息走官方接口撤回）。不要编造 message_id。',
     parameters: {
       type: 'object',
