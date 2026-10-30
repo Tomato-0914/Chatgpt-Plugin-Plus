@@ -4,6 +4,9 @@
  * 官方机器人没有的群操作（戳一戳、点赞、查群员、拉群消息记录等）由 QQBot-Plugin 的野生号辅助代办，
  * 这里照常调用 Yunzai 的群 / 成员 / 好友对象即可。以 _ 开头，不会被当成工具登记。
  */
+import fs from 'node:fs'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /** 发送结果里是否有消息 id（官方机器人失败时返回 { message_id: [], error: [...] }） */
 export function sent (ret) {
@@ -23,6 +26,39 @@ export function targetUser (e, id) {
 
 /** QQ 号写成数字，openid 等保持字符串 */
 export const asId = id => (/^\d{5,12}$/.test(String(id)) ? Number(id) : id)
+
+/** QQBot-Plugin 的 QQ 号 → openid 映射模块（lib/uinMap.js）；没装 QQBot-Plugin 时为 null */
+let uinMap
+async function qqbotUinMap () {
+  if (uinMap !== undefined) return uinMap
+  uinMap = null
+  try {
+    for (const dir of fs.readdirSync(path.resolve('./plugins'))) {
+      const file = path.resolve('./plugins', dir, 'lib/uinMap.js')
+      if (!fs.existsSync(file)) continue
+      const mod = await import(pathToFileURL(file).href)
+      if (typeof mod.getMappedOpenid === 'function' && typeof mod.getAppid === 'function') {
+        uinMap = mod
+        break
+      }
+    }
+  } catch {}
+  return uinMap
+}
+
+/**
+ * @ 某人的消息段。官方机器人 @ 人要把 QQ 号换成 openid，没有绑定 QQ 号的人换不到，@ 会被丢掉，
+ * 这时改成文字“@名字”（real 为 false，对方收不到提醒）
+ * @returns {Promise<{ seg: object|string, real: boolean }>}
+ */
+export async function mention (e, userId, name) {
+  const id = String(userId ?? '')
+  if (e?.bot?.adapter?.id === 'QQBot' && /^\d{5,12}$/.test(id)) {
+    const map = await qqbotUinMap()
+    if (map && !(await map.getMappedOpenid(map.getAppid(e.bot), id))) return { seg: `@${name || id} `, real: false }
+  }
+  return { seg: { type: 'at', qq: asId(id) }, real: true }
+}
 
 export const errorText = err => `操作失败：${err?.message || err}`
 
