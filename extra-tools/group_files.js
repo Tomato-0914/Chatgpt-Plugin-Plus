@@ -89,17 +89,33 @@ function find (list, query, wantDir) {
   const exact = pool.filter(i => i.id === q || i.name === q)
   const hits = exact.length ? exact : pool.filter(i => i.name.toLowerCase().includes(q.toLowerCase()))
   if (!hits.length) throw new Error(`群文件里没有找到${wantDir ? '文件夹' : '文件'}「${q}」`)
-  if (hits.length > 1) throw new Error(`有 ${hits.length} 个${wantDir ? '文件夹' : '文件'}名字包含「${q}」：${hits.slice(0, 10).map(i => i.name).join('、')}，请说完整的名字`)
+  if (hits.length > 1) {
+    if (exact.length > 1) {
+      throw new Error(`有 ${exact.length} 个同名${wantDir ? '文件夹' : '文件'}「${q}」：可以用 all_matches 一起处理（删除时加 keep_newest 保留最新的一个），` +
+        '或者先 search 看每个的 ID，再把 ID 填进 name 指定其中一个')
+    }
+    throw new Error(`有 ${hits.length} 个${wantDir ? '文件夹' : '文件'}名字包含「${q}」：${[...new Set(hits.map(i => i.name))].slice(0, 10).join('、')}，请说完整的名字`)
+  }
   return hits[0]
+}
+
+/** all_matches：名字完全相同（或 ID 相同）的所有文件；没有完全同名的时按包含找，只有一个才算 */
+function findAll (list, query) {
+  const q = String(query ?? '').trim()
+  if (!q) throw new Error('请提供文件名')
+  const exact = list.filter(i => !i.dir && (i.id === q || i.name === q))
+  return exact.length ? exact : [find(list, q, false)]
 }
 
 const folderName = (list, id) => (id === ROOT ? '根目录' : list.find(i => i.id === id)?.name || id)
 
 function line (f, list) {
-  if (f.dir) return `📁 ${f.name}${f.count !== undefined ? `（${f.count} 个文件）` : ''}`
+  // 有同名的时附上 ID，用来指定其中一个
+  const dup = list.filter(i => i.dir === f.dir && i.name === f.name).length > 1 ? ` ID:${f.id}` : ''
+  if (f.dir) return `📁 ${f.name}${f.count !== undefined ? `（${f.count} 个文件）` : ''}${dup}`
   const where = f.parent !== ROOT ? `［${folderName(list, f.parent)}］` : ''
   const info = [size(f.size), f.uploader && `${f.uploader} 上传`, grp.time(f.time), f.downloads && `下载 ${f.downloads} 次`].filter(Boolean).join('，')
-  return `📄 ${where}${f.name}${info ? `（${info}）` : ''}`
+  return `📄 ${where}${f.name}${info ? `（${info}）` : ''}${dup}`
 }
 
 /** 上传来源：网址，或 AI 工作目录里的文件；ICQQ 要传文件内容，OneBot 传网址或本地路径 */
@@ -137,6 +153,7 @@ export class GroupFilesTool extends CustomTool {
     name: 'group_files',
     description: '管理当前群的群文件（需要同群的野生号）：查看文件列表（list，可指定文件夹）、按名字找文件（search）、获取下载链接（url）、查看空间用量（info）、' +
       '上传文件（upload，网址或工作目录里的文件）、删除（delete）、重命名（rename）、移动到文件夹（move）、新建文件夹（mkdir）、删除文件夹（rmdir）、重命名文件夹（rename_folder）。' +
+      '同名文件有多个时：用 all_matches 一起删除 / 移动（keep_newest 保留最新的一个），或用 search 结果里的 ID 填进 name 指定其中一个。' +
       'QQ 群文件只有一层文件夹，文件夹不能移动。删除、重命名、移动、文件夹操作：主人、群主、管理员直接执行，其他人会 @ 主人申请确认。',
     parameters: {
       type: 'object',
@@ -161,6 +178,14 @@ export class GroupFilesTool extends CustomTool {
         source: {
           type: 'string',
           description: 'upload 时的文件：网址，或 AI 工作目录里的文件路径'
+        },
+        all_matches: {
+          type: 'boolean',
+          description: 'delete / move 时对名字完全相同的所有文件一起操作（同名文件有多个时用）'
+        },
+        keep_newest: {
+          type: 'boolean',
+          description: 'delete 且 all_matches 时保留最新上传的一个，只删其余的（清理重复文件）'
         },
         upload_name: {
           type: 'string',
@@ -257,6 +282,35 @@ export class GroupFilesTool extends CustomTool {
           if (!name) return '请提供新的文件夹名'
           title = `把群文件夹「${f.name}」改名为「${name}」`
           run = async () => { await gfs.renameDir(f, name); return `已把文件夹「${f.name}」改名为「${name}」` }
+        }
+      } else if (args.all_matches && (action === 'delete' || action === 'move')) {
+        // 批量：名字完全相同的所有文件；删除时可以保留最新上传的一个（清理重复文件）
+        let files = findAll(all, args.name)
+        if (action === 'delete' && args.keep_newest) {
+          files = [...files].sort((a, b) => Number(b.time || 0) - Number(a.time || 0)).slice(1)
+          if (!files.length) return `「${args.name}」只有一个，不需要清理`
+        }
+        const to = action === 'move' ? (!args.folder || args.folder === '根目录' ? { id: ROOT, name: '根目录' } : find(all, args.folder, true)) : null
+        if (to) files = files.filter(f => f.parent !== to.id)
+        if (!files.length) return `这些文件已经都在${to.name === '根目录' ? '根目录' : `「${to.name}」`}里了`
+        const name = files[0].name
+        const where = to ? (to.id === ROOT ? '根目录' : `文件夹「${to.name}」`) : ''
+        title = action === 'delete'
+          ? `删除 ${files.length} 个群文件「${name}」${args.keep_newest ? '（保留最新上传的一个）' : ''}`
+          : `把 ${files.length} 个群文件「${name}」移动到${where}`
+        run = async () => {
+          const failed = []
+          for (const f of files) {
+            try {
+              await (action === 'delete' ? gfs.rm(f) : gfs.mv(f, to.id))
+            } catch (err) {
+              failed.push(err.message)
+            }
+          }
+          const ok = files.length - failed.length
+          if (!ok) throw new Error(`${files.length} 个都没能${action === 'delete' ? '删除' : `移动到${where}`}：${failed[0]}`)
+          const done = action === 'delete' ? `已删除 ${ok} 个「${name}」` : `已把 ${ok} 个「${name}」移动到${where}`
+          return `${done}${failed.length ? `，${failed.length} 个失败：${failed[0]}` : ''}`
         }
       } else {
         const f = find(all, args.name, false)
