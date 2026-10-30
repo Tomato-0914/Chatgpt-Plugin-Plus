@@ -172,7 +172,7 @@ https://afdian.net/a/ikechan8370
 [![Star History Chart](https://api.star-history.com/svg?repos=ikechan8370/chatgpt-plugin&type=Date)](https://star-history.com/#ikechan8370/chatgpt-plugin&Date)
 
 <details>
-<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 102 个，测试中 17 个）</summary>
+<summary>工具对照表：XxxX 版 → ikechan 版扩展工具（共 296 个，已实现 103 个，测试中 16 个）</summary>
 
 XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本仓库 `extra-tools/` 中实现同样功能的工具对照。
 
@@ -350,7 +350,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 166 | `dice_roll` |  | 掷骰子 | low |  |
 | 167 | `draw_lots` |  | 抽签/抽奖 | low |  |
 | 168 | `get_group_files` | `group_files`（list / search） | 获取群文件列表 | low | ✅ |
-| 169 | `get_file_url` | `group_files`（url） | 获取群文件下载链接 | low | 🆕 |
+| 169 | `get_file_url` | `group_files`（url） | 获取群文件下载链接 | low | ✅ |
 | 170 | `upload_group_file` | `file_send` | 上传文件到群（需要文件URL或本地路径） | high | ✅ |
 | 171 | `delete_group_file` | `group_files`（delete） | 删除群文件 | 危险 | 🆕 |
 | 172 | `create_group_folder` | `group_files`（mkdir） | 创建群文件夹 | high | ✅ |
