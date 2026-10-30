@@ -60,6 +60,14 @@ export async function mention (e, userId, name) {
   return { seg: { type: 'at', qq: asId(id) }, real: true }
 }
 
+/** 官方机器人的 openid 换成绑定的 QQ 号；本来就是 QQ 号时原样返回，没绑定时返回空串 */
+export async function realQQ (e, userId) {
+  const id = String(userId ?? '')
+  if (/^\d{5,12}$/.test(id)) return id
+  const map = await qqbotUinMap()
+  return (map && typeof map.getMappedUin === 'function' && String(await map.getMappedUin(map.getAppid(e?.bot), id) || '')) || ''
+}
+
 export const errorText = err => `操作失败：${err?.message || err}`
 
 /** 野生号（OneBotv11 / ICQQ） */
@@ -124,4 +132,97 @@ export async function fetchHistory (bot, groupId, total) {
     anchor = next
   }
   return [...seen.values()].sort((a, b) => Number(a.time) - Number(b.time))
+}
+
+/* ---------- 在野生号这边找到同一条消息（撤回、精华、表情回应、合并转发共用） ---------- */
+
+/** 默认往前翻多少条群消息 */
+export const SCAN = 200
+const norm = text => String(text ?? '').replace(/\s+/g, '')
+
+/** 发这条消息的人 */
+export const senderOf = m => String(m.user_id ?? m.sender?.user_id ?? '')
+
+/**
+ * 官方机器人收到的消息只有发送时间和内容，消息 ID 野生号用不了：到野生号的消息记录里按时间、内容找同一条。
+ * filter 用来限定消息类型（如合并转发）；限定了类型时，按内容找不到就取时间最接近的那条
+ */
+function sameMessage (history, time, text, filter) {
+  const near = history
+    .filter(m => Math.abs(Number(m.time) - time) <= 120)
+    .filter(m => !filter || filter(m))
+    .sort((a, b) => Math.abs(Number(a.time) - time) - Math.abs(Number(b.time) - time))
+  const t = norm(text).slice(0, 20)
+  const byText = near.find(m => !t || norm(textOf(m)).includes(t) || t.includes(norm(textOf(m)).slice(0, 20)))
+  return byText || (filter ? near[0] : undefined)
+}
+
+/**
+ * 被引用的那条消息（野生号这边的消息对象）；没有引用时返回 null
+ * 当前机器人是野生号时直接取引用，官方机器人收到的引用到野生号的消息记录里找
+ */
+export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) {
+  if (!e.source) return null
+  if (isWildBot(e.bot)) {
+    const reply = await e.getReply?.().catch(() => null)
+    if (reply?.message_id && (!filter || filter(reply))) return reply
+  }
+  const found = sameMessage(await fetchHistory(bot, gid, scan), Number(e.source.time), e.source.message, filter)
+  if (!found) throw new Error('没有在群消息记录里找到被引用的那条消息，可能太早了')
+  return found
+}
+
+/** 当前这条消息（野生号这边的消息对象）：给发消息的人贴表情等用 */
+export async function currentMessage (e, bot, gid) {
+  if (isWildBot(e.bot) && e.bot === bot && e.message_id) return { message_id: e.message_id, seq: e.seq, time: e.time, user_id: e.user_id, message: e.message }
+  const found = sameMessage(await fetchHistory(bot, gid, 50), Number(e.time) || Date.now() / 1000, e.msg ?? e.raw_message)
+  if (!found) throw new Error('没有在群消息记录里找到当前这条消息')
+  return found
+}
+
+/**
+ * 最近的几条消息（不含当前这条请求以及之后的消息），从早到晚
+ * @param {{ users?: string[], keyword?: string, count?: number, filter?: Function, scan?: number }} options
+ */
+export async function recentMessages (e, bot, gid, { users, keyword, count = 1, filter, scan = SCAN } = {}) {
+  const before = Number(e.time) || Infinity
+  const kw = String(keyword ?? '').toLowerCase()
+  return (await fetchHistory(bot, gid, scan))
+    .filter(m => Number(m.time) < before)
+    .filter(m => !users || users.includes(senderOf(m)))
+    .filter(m => !kw || textOf(m).toLowerCase().includes(kw))
+    .filter(m => !filter || filter(m))
+    .slice(-count)
+}
+
+/* ---------- 调用野生号的接口 ---------- */
+
+/** 当前机器人是野生号时用它，否则用任意一个在线的野生号（账号设置、好友等与群无关的操作） */
+export function anyWild (e) {
+  if (isWildBot(e?.bot)) return e.bot
+  for (const id of globalThis.Bot?.uin || []) if (isWildBot(globalThis.Bot[id])) return globalThis.Bot[id]
+  return null
+}
+
+/** 接口返回结果里的错误：OneBot 失败时为 { status: 'failed' } 或 retcode 不为 0，ICQQ 有的方法返回 false */
+export function failure (ret) {
+  if (ret === false) return '接口返回失败'
+  if (ret instanceof Error) return ret.message
+  if (ret?.status === 'failed' || (ret?.retcode && Number(ret.retcode) !== 0)) return ret.wording || ret.message || ret.msg || `错误码 ${ret.retcode}`
+  return ''
+}
+
+/**
+ * 依次尝试几种调用方式，第一种存在的执行；都不存在时说明野生号不支持
+ * calls: [[对象, 方法名, 参数数组], ...]，最后可以给 [bot, 'sendApi', [action, params]] 走 OneBot 接口
+ */
+export async function invoke (calls, label = '这个操作') {
+  for (const [obj, method, args = []] of calls) {
+    if (typeof obj?.[method] !== 'function') continue
+    const ret = await obj[method](...args)
+    const error = failure(ret)
+    if (error) throw new Error(error)
+    return ret?.data ?? ret
+  }
+  throw new Error(`野生号不支持${label}`)
 }

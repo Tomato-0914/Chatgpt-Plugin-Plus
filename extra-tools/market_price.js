@@ -1,4 +1,8 @@
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { CustomTool } from 'chaite'
+
+const sixty = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_sixty.js')).href)
 
 const TIMEOUT = 15000
 const HEADERS = {
@@ -149,20 +153,32 @@ async function metals (metal) {
   return lines.join('\n')
 }
 
+/** 今日油价（60s API），省份不填为北京 */
+async function oil (province) {
+  const region = String(province ?? '').trim().replace(/(省|市|自治区|壮族自治区|回族自治区|维吾尔自治区|特别行政区)$/, '')
+  const data = await sixty.fetch60s(`/fuel-price${region ? `?region=${encodeURIComponent(region)}` : ''}`)
+  const lines = [`${data.region || region || '北京'}今日油价${data.updated ? `（更新于 ${data.updated}）` : ''}`,
+    ...(data.items || []).map(i => `${i.name}：${i.price_desc || i.price}`)]
+  const trend = data.trend || {}
+  if (trend.next_adjustment_date) lines.push(`下次调价窗口：${trend.next_adjustment_date}${trend.change_liter_desc || trend.direction ? `，${trend.change_liter_desc || trend.direction}` : ''}`)
+  return lines.join('\n')
+}
+
 export class MarketPriceTool extends CustomTool {
   name = 'market_price'
 
   function = {
     name: 'market_price',
     description: '查询实时行情：外汇汇率（rate，中国银行外汇牌价，含现汇 / 现钞买入卖出价和中行折算价，可把外币金额换算成人民币）、' +
-      '黄金白银价格（metal，上海金、伦敦金、纽约金、白银）。用户问汇率、今日金价银价时调用，不要用 web_search。',
+      '黄金白银价格（metal，上海金、伦敦金、纽约金、白银）、今日油价（oil，92 / 95 / 98 号汽油、0 号柴油和下次调价）。' +
+      '用户问汇率、今日金价银价、油价时调用，不要用 web_search。',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['rate', 'metal'],
-          description: 'rate=汇率（默认）；metal=黄金白银'
+          enum: ['rate', 'metal', 'oil'],
+          description: 'rate=汇率（默认）；metal=黄金白银；oil=油价'
         },
         currencies: {
           type: 'string',
@@ -171,6 +187,10 @@ export class MarketPriceTool extends CustomTool {
         amount: {
           type: 'number',
           description: 'action=rate 时要换算成人民币的外币金额（可选）'
+        },
+        province: {
+          type: 'string',
+          description: 'action=oil 时的省份，如 广东、上海，默认北京'
         },
         metal: {
           type: 'string',
@@ -184,6 +204,7 @@ export class MarketPriceTool extends CustomTool {
 
   async run (args) {
     try {
+      if (args.action === 'oil') return await oil(args.province)
       if (args.action === 'metal') return await metals(['gold', 'silver', 'all'].includes(args.metal) ? args.metal : 'gold')
       return await exchange(args.currencies, Number(args.amount) > 0 ? Number(args.amount) : 0)
     } catch (err) {
