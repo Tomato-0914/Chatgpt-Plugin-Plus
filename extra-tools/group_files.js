@@ -39,9 +39,15 @@ function entries (ret, parent) {
   return list.map(i => normalize(i, parent))
 }
 
-/** 野生号的群文件接口：ICQQ 用 group.fs，OneBot 用 sendApi */
+/**
+ * 野生号的群文件接口：ICQQ 用 group.fs；OneBot 直接调 OneBot 接口
+ * TRSS 的 OneBotv11 也给群对象挂了 fs，但参数规则和 ICQQ 不同：ls 传了参数就按文件夹 ID 查（传 "/" 拿不到文件夹），
+ * rm 只能删文件、还要 busid，所以 OneBot 除了上传都不走它；上传仍用它，它会先把网址 / Buffer 存成本地文件再交给协议端
+ */
 function fsOf (bot, gid) {
-  const gfs = bot.pickGroup(Number(gid))?.fs
+  const group = bot.pickGroup(Number(gid))
+  const icqq = bot.adapter?.name === 'ICQQ'
+  const gfs = icqq ? group?.fs : null
   const api = (action, params = {}) => [bot, 'sendApi', [action, { group_id: Number(gid), ...params }]]
   const call = (calls, label) => chat.invoke(calls, label).catch(err => {
     throw new Error(NO_PERMISSION.test(err.message) ? `野生号没有权限（${err.message}）：可能需要野生号是群管理员，或本群设置了仅管理员可上传` : err.message)
@@ -62,7 +68,10 @@ function fsOf (bot, gid) {
     },
     url: f => call([[gfs, 'download', [f.id]], api('get_group_file_url', { file_id: f.id, busid: f.busid })], '获取下载链接'),
     df: () => call([[gfs, 'df'], api('get_group_file_system_info')], '查看群文件空间'),
-    upload: (file, name, folder) => call([[gfs, 'upload', [file, folder, name]], api('upload_group_file', { file, name, folder, folder_id: folder })], '上传群文件'),
+    upload: (file, name, folder) => {
+      const dir = folder === ROOT ? (icqq ? ROOT : undefined) : folder
+      return call([[group?.fs, 'upload', [file, dir, name]], api('upload_group_file', { file, name, ...(dir ? { folder: dir, folder_id: dir } : {}) })], '上传群文件')
+    },
     rm: f => call([[gfs, 'rm', [f.id]], api('delete_group_file', { file_id: f.id, busid: f.busid })], '删除群文件'),
     rename: (f, name) => call([[gfs, 'rename', [f.id, name]], api('rename_group_file', { file_id: f.id, current_parent_directory: f.parent, new_name: name })], '重命名群文件'),
     mv: (f, folder) => call([[gfs, 'mv', [f.id, folder]], api('move_group_file', { file_id: f.id, current_parent_directory: f.parent, target_parent_directory: folder })], '移动群文件'),
