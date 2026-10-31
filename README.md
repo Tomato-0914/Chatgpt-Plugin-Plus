@@ -212,11 +212,11 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 28 | `get_oil_price` | `market_price`（oil） | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low | ✅ |
 | 29 | `website` | `fetch_webpage` | 访问网页并获取内容（支持动态渲染） | low | ✅ |
 | 30 | `fetch_url` | `fetch_webpage` | 简单HTTP请求获取URL内容（不渲染JavaScript）。 | low | ✅ |
-| 31 | `get_current_context` | ikechan 内置群聊上下文 | 获取当前会话的上下文信息 | low |  |
-| 32 | `get_conversation_context` | ikechan 内置群聊上下文 | 获取当前对话的详细上下文信息 | low |  |
-| 33 | `clear_conversation` | #结束对话 命令 | 清除当前对话历史，开始新会话 | low |  |
-| 34 | `get_reply_message` | ikechan 内置（引用消息自动带入） | 获取被引用/回复的消息内容。 | low |  |
-| 35 | `get_at_members` |  | 获取当前消息中@的成员列表 | low |  |
+| 31 | `get_current_context` | `chat_context`（current） | 获取当前会话的上下文信息 | low | 🆕 |
+| 32 | `get_conversation_context` | `chat_context`（conversation） | 获取当前对话的详细上下文信息 | low | 🆕 |
+| 33 | `clear_conversation` | `chat_context`（clear）、#结束对话 命令 | 清除当前对话历史，开始新会话 | low | 🆕 |
+| 34 | `get_reply_message` | `chat_context`（reply） | 获取被引用/回复的消息内容。 | low | 🆕 |
+| 35 | `get_at_members` | `chat_context`（at） | 获取当前消息中@的成员列表 | low | 🆕 |
 | 36 | `get_group_context` | `search_chat_history` | 获取群聊上下文信息（仅群聊有效） | low | ✅ |
 | 37 | `send_to_master` | `send_message`（to_master） | 发送私聊消息给主人。 | high | ✅ |
 | 38 | `get_master_info` |  | 获取主人信息列表 | low |  |

@@ -101,6 +101,8 @@ export function textOf (msg) {
       const data = seg.data && typeof seg.data === 'object' ? seg.data : seg
       if (seg.type === 'text') return data.text ?? ''
       if (seg.type === 'at') return `@${data.qq ?? ''} `
+      // 合并转发卡片和官方机器人的引用预览一致，写成 [聊天记录]
+      if (seg.type === 'json' && /com\.tencent\.multimsg/.test(typeof data.data === 'string' ? data.data : JSON.stringify(data.data ?? ''))) return SEG_TEXT.forward
       return SEG_TEXT[seg.type] ?? `[${seg.type}]`
     }).join('').replace(/\s+/g, ' ').trim()
   }
