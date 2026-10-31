@@ -30,6 +30,9 @@ async function essenceList (bot, gid) {
     const ret = await chat.invoke([[bot, 'sendApi', ['get_essence_msg_list', { group_id: Number(gid) }]]], '查看精华消息')
     return (Array.isArray(ret) ? ret : []).map(m => ({
       id: m.message_id,
+      seq: m.msg_seq ?? m.message_seq,
+      random: m.msg_random,
+      senderTime: Number(m.sender_time) || 0,
       senderId: String(m.sender_id ?? ''),
       sender: `${m.sender_nick || ''}(${m.sender_id})`,
       operator: m.operator_nick || m.operator_id,
@@ -65,22 +68,56 @@ async function target (e, bot, gid, args) {
 }
 
 /**
- * 精华列表里要取消的那条（列表按 list 的显示顺序，1 是最近设置的）；
- * 只有 OneBot 的列表带消息 ID，ICQQ 返回 null 交给群消息记录找
+ * 取消精华的那条：一律落到精华列表里的一条，用列表给的消息 ID 删（列表每次现查，不缓存）。
+ * 没有引用：按序号（list 的显示顺序，1 是最近设置的）/ 发送人 / 关键词在列表里找；
+ * 引用了消息：先在群消息记录里找到被引用的那条，再到列表里对——消息 ID → 消息序号 → 同一个人、发送时间最接近的。
+ * 只按“[图片]”这类内容去群消息记录里找，同一个人发过几张图时会对错，所以不能直接拿记录里的那条去删。
+ * 只有 OneBot 的列表带消息 ID；ICQQ 返回 null，交给群消息记录找
  */
-async function fromList (bot, gid, args) {
-  const index = Math.floor(Number(args.index))
-  const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
-  const keyword = String(args.keyword ?? '').trim().toLowerCase()
-  if (!index && !userId && !keyword) return null
+async function removeTarget (e, bot, gid, args) {
+  if (typeof bot.sendApi !== 'function') return null
   const list = (await essenceList(bot, gid)).filter(m => m.id !== undefined && m.id !== null).reverse()
-  if (!list.length) return null
-  if (index) {
-    if (!list[index - 1]) throw new Error(`精华列表只有 ${list.length} 条，没有第 ${index} 条`)
-    return { ...list[index - 1], message_id: list[index - 1].id }
+  if (!list.length) throw new Error('这个群没有精华消息（或精华列表里没有消息 ID）')
+
+  if (!e.source) {
+    const index = Math.floor(Number(args.index))
+    const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
+    const keyword = String(args.keyword ?? '').trim().toLowerCase()
+    if (index) {
+      if (!list[index - 1]) throw new Error(`精华列表只有 ${list.length} 条，没有第 ${index} 条`)
+      return list[index - 1]
+    }
+    if (!userId && !keyword) throw new Error('请引用那条精华消息，或说明是精华列表里的第几条（index）/ 谁发的（user_id）/ 内容关键词（keyword）')
+    const uid = userId ? await chat.realQQ(e, userId) : ''
+    const hit = list.find(i => (!uid || i.senderId === String(uid)) && (!keyword || i.text.toLowerCase().includes(keyword)))
+    if (!hit) throw new Error('精华列表里没有找到符合条件的精华消息')
+    return hit
   }
-  const m = list.find(i => (!userId || i.senderId === userId) && (!keyword || i.text.toLowerCase().includes(keyword)))
-  return m ? { ...m, message_id: m.id } : null
+
+  const m = await chat.quotedMessage(e, bot, gid).catch(() => null)
+  const byId = m && list.find(i => String(i.id) === String(m.message_id))
+  if (byId) return byId
+  const seqs = [m?.real_seq, m?.message_seq, m?.seq].filter(v => v !== undefined && v !== null).map(String)
+  const bySeq = seqs.length && list.find(i => i.seq !== undefined && i.seq !== null && seqs.includes(String(i.seq)))
+  if (bySeq) return bySeq
+  const quotedSender = /^\d{5,12}$/.test(String(e.source.user_id ?? '')) ? String(e.source.user_id) : ''
+  const sender = (m && chat.senderOf(m)) || quotedSender
+  const time = Number(m?.time ?? e.source.time) || 0
+  const same = list.filter(i => sender && i.senderId === sender)
+  if (same.length === 1) return same[0]
+  if (same.length > 1 && time) return same.sort((a, b) => Math.abs(a.senderTime - time) - Math.abs(b.senderTime - time))[0]
+  throw new Error(`被引用的消息不在精华列表里（可能已经不是精华了）；精华列表共 ${list.length} 条，可以用 index 指定第几条`)
+}
+
+/** QQ 网页版的取消精华（按消息序号），协议端的 delete_essence_msg 失败时用 */
+async function webCancel (bot, gid, item) {
+  const cred = await web.credentials(bot, 'qun.qq.com')
+  await web.call(`https://qun.qq.com/cgi-bin/group_digest/cancel_digest?bkn=${cred.bkn}&group_code=${gid}&msg_seq=${item.seq}&msg_random=${item.random}`, cred)
+}
+
+/** 取消后还在不在精华列表里（接口报“已被移除”时用来确认） */
+async function stillEssence (bot, gid, id) {
+  return (await essenceList(bot, gid).catch(() => [])).some(i => String(i.id) === String(id))
 }
 
 export class EssenceTool extends CustomTool {
@@ -90,7 +127,7 @@ export class EssenceTool extends CustomTool {
     name: 'essence',
     description: '群精华消息（需要同群的野生号）：查看精华消息列表（list）、把一条消息设为精华（set）、取消精华（remove）。' +
       '设置 / 取消时：用户引用了消息就是被引用的那条，直接调用、不要填 user_id / keyword（工具会自己读取引用，看不到引用内容也直接调用，图片也一样）；' +
-      '没有引用时用 user_id / keyword 找最近一条；取消精华还可以用 index（list 里的序号，1 是最近设置的）。需要野生号是管理员。' +
+      '没有引用时用 user_id / keyword 找最近一条；取消精华还可以用 index（list 里的序号，1 是最近设置的），取消时工具会到精华列表里核对是哪一条。需要野生号是管理员。' +
       '主人、群主、管理员要求时直接执行；其他人要求设置 / 取消时会 @ 主人申请确认（主人、群主、管理员都能确认，告诉用户等确认即可）。',
     parameters: {
       type: 'object',
@@ -131,9 +168,9 @@ export class EssenceTool extends CustomTool {
 
       if (args.action === 'set' || args.action === 'remove') {
         const set = args.action === 'set'
-        // 取消精华且没有引用：从精华列表里找（序号 / 发送人 / 关键词），找不到再按群消息记录找
-        const hit = !set && !e.source ? await fromList(bot, gid, args) : null
-        const m = hit || await target(e, bot, gid, args)
+        // 取消精华：落到精华列表里的一条（ICQQ 没有带 ID 的列表，按群消息记录找）
+        const hit = set ? null : await removeTarget(e, bot, gid, args)
+        const m = hit ? { message_id: hit.id } : await target(e, bot, gid, args)
         const desc = hit
           ? `${hit.sender}：${preview(hit.text)}`
           : `${m.sender?.card || m.sender?.nickname || ''}(${chat.senderOf(m)})：${preview(chat.textOf(m))}`
@@ -147,7 +184,17 @@ export class EssenceTool extends CustomTool {
                 : [[bot, 'removeEssenceMessage', [m.message_id]], [bot, 'sendApi', ['delete_essence_msg', { message_id: m.message_id }]]],
               set ? '设置精华' : '取消精华')
             } catch (err) {
-              throw new Error(explain(err.message))
+              if (set || !hit) throw new Error(explain(err.message))
+              // 取消失败：再查一次列表，确实不在了就当已经取消（接口有时报“已被移除精华”）
+              if (!(await stillEssence(bot, gid, hit.id))) return `这条消息已经不是精华了：${desc}`
+              // 还在：协议端按消息 ID 取消不一定成功，改用 QQ 网页版按消息序号取消
+              if (hit.seq === undefined || hit.seq === null || hit.random === undefined || hit.random === null) throw new Error(explain(err.message))
+              try {
+                await webCancel(bot, gid, hit)
+              } catch (err2) {
+                throw new Error(`${explain(err.message)}；网页接口也失败：${err2.message}`)
+              }
+              if (await stillEssence(bot, gid, hit.id)) throw new Error(`${explain(err.message)}；网页接口返回成功，但精华列表里还有这条`)
             }
             return `已${set ? '设为精华' : '取消精华'}：${desc}`
           }
