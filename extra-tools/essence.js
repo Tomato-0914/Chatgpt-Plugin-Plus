@@ -62,21 +62,42 @@ async function webList (bot, gid) {
 
 /**
  * 协议端的列表没带消息内容时（有的只给序号、发送人、设置人等几个字段）补上内容：
- * 先按消息序号对 QQ 网页版的精华列表，再对群消息记录；都拿不到就保持没有内容
+ * 先对 QQ 网页版的精华列表（按消息序号，对不上再按同一个发送人、设置时间最接近），再对群消息记录；
+ * 都拿不到就保持没有内容，原因记在 list.textError 里
  */
 async function fillText (bot, gid, list) {
-  const missing = list.filter(i => !i.text && i.seq !== undefined && i.seq !== null)
+  const missing = list.filter(i => !i.text)
   if (!missing.length) return
-  const fill = (key, text) => { for (const i of missing) if (!i.text && String(i.seq) === key && text) i.text = text }
+  const errors = []
   try {
-    for (const w of await webList(bot, gid)) if (w.seq !== undefined && w.seq !== null) fill(String(w.seq), w.text)
-  } catch {}
-  if (!missing.some(i => !i.text)) return
-  try {
-    for (const m of await chat.fetchHistory(bot, gid, chat.SCAN)) {
-      for (const seq of [m.real_seq, m.message_seq, m.seq]) if (seq !== undefined && seq !== null) fill(String(seq), chat.textOf(m))
+    const webItems = (await webList(bot, gid)).filter(w => w.text)
+    for (const i of missing) {
+      const bySeq = i.seq !== undefined && i.seq !== null && webItems.find(w => String(w.seq) === String(i.seq))
+      const near = !bySeq && webItems
+        .filter(w => w.senderId && w.senderId === i.senderId && (!i.time || !w.time || Math.abs(w.time - i.time) <= 120))
+        .sort((a, b) => Math.abs(a.time - i.time) - Math.abs(b.time - i.time))[0]
+      const hit = bySeq || near
+      if (hit) {
+        i.text = hit.text
+        if (i.random === undefined || i.random === null) i.random = hit.random
+        if (i.seq === undefined || i.seq === null) i.seq = hit.seq
+      }
     }
-  } catch {}
+    if (!webItems.length) errors.push('网页版精华列表是空的')
+  } catch (err) {
+    errors.push(`网页版精华列表：${err.message}`)
+  }
+  if (missing.some(i => !i.text)) {
+    try {
+      for (const m of await chat.fetchHistory(bot, gid, chat.SCAN)) {
+        const seqs = [m.real_seq, m.message_seq, m.seq].filter(v => v !== undefined && v !== null).map(String)
+        for (const i of missing) if (!i.text && i.seq !== undefined && i.seq !== null && seqs.includes(String(i.seq))) i.text = chat.textOf(m)
+      }
+    } catch (err) {
+      errors.push(`群消息记录：${err.message}`)
+    }
+  }
+  if (missing.some(i => !i.text)) list.textError = errors.join('；') || '按消息序号和发送人都没对上'
 }
 
 /** 精华消息列表（每次现查）：OneBot 的 get_essence_msg_list，ICQQ 用网页接口；withText 为 false 时不补内容（只核对在不在） */
@@ -271,7 +292,7 @@ export class EssenceTool extends CustomTool {
       // 发送人、内容都没解析出来：多半是协议端的字段名不一样，把字段名带上方便排查
       const unknown = list.every(m => !m.sender && !m.text)
         ? `\n（没有解析出发送人和内容，接口返回的字段：${list[0].keys.join('、')}）`
-        : list.every(m => !m.text) ? '\n（协议端的精华列表不带消息内容，QQ 网页版接口和最近的群消息记录里也没找到，只能显示发送人）' : ''
+        : list.every(m => !m.text) ? `\n（协议端的精华列表不带消息内容，补内容也没成功：${list.textError || '原因未知'}）` : ''
       return `共 ${list.length} 条精华消息${list.length > limit ? `，显示最近 ${limit} 条` : ''}（序号可以用于取消，1 是最近设置的）：\n${lines.join('\n')}${unknown}`
     } catch (err) {
       return chat.errorText(err)

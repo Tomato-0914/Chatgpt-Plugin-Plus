@@ -279,10 +279,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 95 | `get_sign_in_today` | `group_activity`（sign_in） | 获取今日群打卡列表。 | low | ✅ |
 | 96 | `get_speak_rank` | `group_activity`（speak_rank） | 获取群发言排行榜。 | low | ✅ |
 | 97 | `get_group_data` | `group_activity`（data） | 获取群活跃数据统计，包括消息总数、活跃成员数、新增成员数、退群人数等。 | low | ✅ |
-| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | 🆕 |
-| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | 🆕 |
-| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | 🆕 |
-| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | 🆕 |
+| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | ✅ |
+| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | ✅ |
+| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | ✅ |
+| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | ✅ |
 | 102 | `get_inactive_members` | `group_members`（inactive） | 获取群内不活跃成员列表。 | low | ✅ |
 | 103 | `get_recent_join_members` | `group_members`（recent_join） | 获取最近入群的成员列表。 | low | ✅ |
 | 104 | `get_group_honor` | `group_activity`（honor） | 获取群荣誉信息，包括龙王、群聊之火、群聊炽焰、冒尖小春笋、快乐源泉等荣誉称号及获得者。 | low | ✅ |
@@ -437,7 +437,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 253 | `get_stranger_info` | `user_profile` | 获取陌生人信息 | low | ✅ |
 | 254 | `get_version_info` |  | 获取机器人版本信息 | low |  |
 | 255 | `get_online_clients` |  | 获取当前账号在线客户端列表 | low |  |
-| 256 | `set_qq_avatar` | `bot_account`（set_avatar） | 设置机器人头像（危险操作） | 危险 | 🆕 |
+| 256 | `set_qq_avatar` | `bot_account`（set_avatar） | 设置机器人头像（危险操作） | 危险 | ✅ |
 | 257 | `get_model_show` |  | 获取机型显示信息 | low |  |
 | 258 | `get_self_info` |  | 获取机器人自身的完整信息（综合） | low |  |
 | 259 | `list_skills` | ikechan 内置 Skill | 列出所有可用的技能(skills)及其描述。 | low |  |
@@ -464,8 +464,8 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 280 | `set_group_add_request` | `join_request`（approve / reject） | 处理加群申请 | 危险 | ✅ |
 | 281 | `set_friend_add_request` |  | 处理好友申请 | 危险 |  |
 | 282 | `get_group_muted_list` |  | 获取群禁言列表 | low |  |
-| 283 | `set_group_leave` | `bot_account`（quit_group） | 退出群聊（需谨慎使用） | 危险 | 🆕 |
-| 284 | `delete_friend` | `bot_account`（delete_friend） | 删除好友（需谨慎使用） | 危险 | 🆕 |
+| 283 | `set_group_leave` | `bot_account`（quit_group） | 退出群聊（需谨慎使用） | 危险 | ✅ |
+| 284 | `delete_friend` | `bot_account`（delete_friend） | 删除好友（需谨慎使用） | 危险 | ✅ |
 | 285 | `set_group_portrait` |  | 设置群头像（需要管理员权限） | 危险 |  |
 | 286 | `get_group_at_all_remain` |  | 获取群@全体成员剩余次数 | low |  |
 | 287 | `set_group_anonymous_ban` |  | 禁言群匿名成员 | 危险 |  |

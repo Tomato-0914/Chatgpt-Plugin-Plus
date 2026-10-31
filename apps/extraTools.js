@@ -41,6 +41,8 @@ function processorType (code) {
 
 const hash = code => crypto.createHash('md5').update(code).digest('hex')
 
+const loadApproval = () => import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
+
 /**
  * 把目录里的代码登记进 manager
  * @param {string} dir
@@ -178,10 +180,18 @@ export class ChatGPTExtraTools extends plugin {
     })
   }
 
+  /** 主人在官方机器人的群里说话时记下他在这个群的原始 openid（确认按钮里给主人单独一行用），不拦截消息 */
+  accept (e) {
+    if (e.isMaster && e.group_id && e.bot?.adapter?.id === 'QQBot') {
+      loadApproval().then(a => a.rememberMaster(e)).catch(() => {})
+    }
+    return false
+  }
+
   async approve (e) {
     const [, word, id] = String(e.msg || '').trim().match(APPROVE_REG) || []
     if (!word) return false
-    const approval = await import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
+    const approval = await loadApproval()
     const text = await approval.decide(e, /^(#确认|#?yes|#?y)$/i.test(word), id)
     if (text === null) return false
     await e.reply(text)
