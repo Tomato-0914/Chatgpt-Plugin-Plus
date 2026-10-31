@@ -452,8 +452,8 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 268 | `update_custom_tool` |  | 覆盖更新模型自定义 JavaScript 工具并原子热加载；失败会恢复旧版本。 | 危险 |  |
 | 269 | `invoke_custom_tool` |  | 在当前工具调用链中立即执行已热加载的模型自定义工具，解决当前模型客户端工具列表尚未重建的问… | 危险 |  |
 | 270 | `delete_custom_tool` |  | 删除模型自定义 JavaScript 工具并热加载；失败会恢复原文件。 | 危险 |  |
-| 271 | `mute_member` | `group_admin`（mute / unmute） | 禁言群成员，支持单个或批量禁言（需要管理员权限） | 危险 | ✅ |
-| 272 | `kick_member` | `group_admin`（kick） | 踢出群成员，支持单个或批量踢人（需要管理员权限） | 危险 | ✅ |
+| 271 | `mute_member` | `group_admin`（mute / unmute） | 禁言群成员，支持单个或批量禁言（需要管理员权限） | 危险 | 🆕 |
+| 272 | `kick_member` | `group_admin`（kick、blacklist） | 踢出群成员，支持单个或批量踢人（需要管理员权限） | 危险 | 🆕 |
 | 273 | `set_group_card` | `group_admin`（set_card） | 设置群成员名片，支持单个或批量设置 | 危险 | ✅ |
 | 274 | `set_group_whole_ban` | `group_admin`（mute_all） | 设置全群禁言（需要管理员权限） | 危险 | ✅ |
 | 275 | `set_group_admin` |  | 设置/取消群管理员，支持单个或批量设置（需要群主权限） | 危险 |  |
@@ -461,7 +461,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 277 | `set_group_special_title` | `group_admin`（set_title） | 设置群成员专属头衔，支持单个或批量设置（需要群主权限） | 危险 | ✅ |
 | 278 | `send_group_notice` |  | 发送群公告（需要管理员权限） | 危险 |  |
 | 279 | `delete_group_notice` |  | 删除群公告（需要管理员权限） | 危险 |  |
-| 280 | `set_group_add_request` | QQBot-Plugin 入群申请（#QQBot入群申请） | 处理加群申请 | 危险 |  |
+| 280 | `set_group_add_request` | `join_request`（approve / reject） | 处理加群申请 | 危险 | 🆕 |
 | 281 | `set_friend_add_request` |  | 处理好友申请 | 危险 |  |
 | 282 | `get_group_muted_list` |  | 获取群禁言列表 | low |  |
 | 283 | `set_group_leave` | `bot_account`（quit_group） | 退出群聊（需谨慎使用） | 危险 | 🆕 |
@@ -470,7 +470,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 286 | `get_group_at_all_remain` |  | 获取群@全体成员剩余次数 | low |  |
 | 287 | `set_group_anonymous_ban` |  | 禁言群匿名成员 | 危险 |  |
 | 288 | `set_group_anonymous` |  | 设置群匿名功能开关 | 危险 |  |
-| 289 | `get_group_system_msg` | QQBot-Plugin 入群申请（#QQBot入群申请） | 获取群系统消息（加群请求、邀请等） | low |  |
+| 289 | `get_group_system_msg` | `join_request`（list） | 获取群系统消息（加群请求、邀请等） | low | 🆕 |
 | 290 | `execute_command` | `shell` | 执行 Shell 命令。 | 危险 | ✅ |
 | 291 | `get_system_info` | `shell` | 获取系统信息，包括操作系统、CPU、内存、磁盘等 | low | ✅ |
 | 292 | `get_process_info` | `shell` | 获取当前 Node.js 进程信息 | low | ✅ |

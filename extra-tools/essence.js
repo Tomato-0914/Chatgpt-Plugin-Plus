@@ -67,7 +67,7 @@ export class EssenceTool extends CustomTool {
     name: 'essence',
     description: '群精华消息（需要同群的野生号）：查看精华消息列表（list）、把一条消息设为精华（set）、取消精华（remove）。' +
       '设置 / 取消时引用那条消息（工具会自己读取引用，看不到引用内容也直接调用），或用 user_id / keyword 找最近一条；需要野生号是管理员。' +
-      '主人要求时直接执行；其他人要求设置 / 取消时会 @ 主人申请确认（告诉用户等主人确认即可）。',
+      '主人、群主、管理员要求时直接执行；其他人要求设置 / 取消时会 @ 主人申请确认（主人、群主、管理员都能确认，告诉用户等确认即可）。',
     parameters: {
       type: 'object',
       properties: {
@@ -106,6 +106,7 @@ export class EssenceTool extends CustomTool {
         const m = await target(e, bot, gid, args)
         const desc = `${m.sender?.card || m.sender?.nickname || ''}(${chat.senderOf(m)})：${preview(chat.textOf(m))}`
         return await approval.guard(e, {
+          level: 'manager',
           title: `${set ? '把这条消息设为精华' : '取消这条消息的精华'}：${desc}`,
           run: async () => {
             try {
