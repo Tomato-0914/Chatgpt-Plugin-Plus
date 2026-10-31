@@ -101,6 +101,8 @@ export function textOf (msg) {
       const data = seg.data && typeof seg.data === 'object' ? seg.data : seg
       if (seg.type === 'text') return data.text ?? ''
       if (seg.type === 'at') return `@${data.qq ?? ''} `
+      // 合并转发卡片和官方机器人的引用预览一致，写成 [聊天记录]
+      if (seg.type === 'json' && /com\.tencent\.multimsg/.test(typeof data.data === 'string' ? data.data : JSON.stringify(data.data ?? ''))) return SEG_TEXT.forward
       return SEG_TEXT[seg.type] ?? `[${seg.type}]`
     }).join('').replace(/\s+/g, ' ').trim()
   }
@@ -180,19 +182,32 @@ function isCurrent (e, m) {
  */
 export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) {
   if (!e.source) return null
-  if (isWildBot(e.bot)) {
-    const reply = await e.getReply?.().catch(() => null)
-    if (reply?.message_id && (!filter || filter(reply))) return reply
-  }
+  const reply = await e.getReply?.().catch(() => null)
+  if (isWildBot(e.bot) && reply?.message_id && (!filter || filter(reply))) return reply
   const now = Number(e.time) || Infinity
   const history = (await fetchHistory(bot, gid, scan))
     .filter(m => Number(m.time) < now || (Number(m.time) <= now + 2 && !isBotMsg(m)))
     .filter(m => !isCurrent(e, m))
   const time = Number(e.source.time) || now
   const sender = /^\d{5,12}$/.test(String(e.source.user_id ?? '')) ? String(e.source.user_id) : ''
-  const found = (sender && sameMessage(history, time, e.source.message, filter, sender)) || sameMessage(history, time, e.source.message, filter)
-  if (!found) throw new Error('没有在群消息记录里找到被引用的那条消息，可能太早了')
-  return found
+  // 引用信息里的文字是官方接口给的原文，图片、表情等写法和野生号的记录对不上；
+  // 官方机器人的消息记录（getReply）有消息段，转成同样的写法再比一次
+  const texts = [...new Set([e.source.message, reply?.message && textOf(reply)].filter(t => t !== undefined && t !== null))]
+  for (const who of sender ? [sender, ''] : ['']) {
+    for (const text of texts.length ? texts : ['']) {
+      const found = sameMessage(history, time, text, filter, who)
+      if (found) return found
+    }
+  }
+  // 官方机器人记下了被引用的消息时（有 seq），引用信息里的时间是准的：取前后 5 秒内最近的那条
+  if (e.source.seq) {
+    const near = history
+      .filter(m => Math.abs(Number(m.time) - time) <= 5 && (!filter || filter(m)) && (!sender || senderOf(m) === sender))
+      .sort((a, b) => Math.abs(Number(a.time) - time) - Math.abs(Number(b.time) - time))[0]
+    if (near) return near
+  }
+  const brief = String(e.source.message ?? '').replace(/\s+/g, ' ').slice(0, 30)
+  throw new Error(`没有在群消息记录里找到被引用的那条消息（引用信息：${Number.isFinite(time) ? beijing(time * 1000) : '时间未知'}，内容「${brief}」，野生号最近 ${history.length} 条记录里没有对上的）`)
 }
 
 /** 当前这条消息（野生号这边的消息对象）：给发消息的人贴表情等用 */
