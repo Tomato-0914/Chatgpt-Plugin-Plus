@@ -212,11 +212,11 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 28 | `get_oil_price` | `market_price`（oil） | 获取今日油价（92/95/98 号汽油、0 号柴油）和下次调价信息 | low | ✅ |
 | 29 | `website` | `fetch_webpage` | 访问网页并获取内容（支持动态渲染） | low | ✅ |
 | 30 | `fetch_url` | `fetch_webpage` | 简单HTTP请求获取URL内容（不渲染JavaScript）。 | low | ✅ |
-| 31 | `get_current_context` | `chat_context`（current） | 获取当前会话的上下文信息 | low | 🆕 |
-| 32 | `get_conversation_context` | `chat_context`（conversation） | 获取当前对话的详细上下文信息 | low | 🆕 |
-| 33 | `clear_conversation` | `chat_context`（clear）、#结束对话 命令 | 清除当前对话历史，开始新会话 | low | 🆕 |
-| 34 | `get_reply_message` | `chat_context`（reply） | 获取被引用/回复的消息内容。 | low | 🆕 |
-| 35 | `get_at_members` | `chat_context`（at） | 获取当前消息中@的成员列表 | low | 🆕 |
+| 31 | `get_current_context` | `chat_context`（current） | 获取当前会话的上下文信息 | low | ✅ |
+| 32 | `get_conversation_context` | `chat_context`（conversation） | 获取当前对话的详细上下文信息 | low | ✅ |
+| 33 | `clear_conversation` | `chat_context`（clear）、#结束对话 命令 | 清除当前对话历史，开始新会话 | low | ✅ |
+| 34 | `get_reply_message` | `chat_context`（reply） | 获取被引用/回复的消息内容。 | low | ✅ |
+| 35 | `get_at_members` | `chat_context`（at） | 获取当前消息中@的成员列表 | low | ✅ |
 | 36 | `get_group_context` | `search_chat_history` | 获取群聊上下文信息（仅群聊有效） | low | ✅ |
 | 37 | `send_to_master` | `send_message`（to_master） | 发送私聊消息给主人。 | high | ✅ |
 | 38 | `get_master_info` |  | 获取主人信息列表 | low |  |
@@ -279,10 +279,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 95 | `get_sign_in_today` | `group_activity`（sign_in） | 获取今日群打卡列表。 | low | ✅ |
 | 96 | `get_speak_rank` | `group_activity`（speak_rank） | 获取群发言排行榜。 | low | ✅ |
 | 97 | `get_group_data` | `group_activity`（data） | 获取群活跃数据统计，包括消息总数、活跃成员数、新增成员数、退群人数等。 | low | ✅ |
-| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | ✅ |
-| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | ✅ |
-| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | ✅ |
-| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | ✅ |
+| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | 🆕 |
+| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | 🆕 |
+| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | 🆕 |
+| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | 🆕 |
 | 102 | `get_inactive_members` | `group_members`（inactive） | 获取群内不活跃成员列表。 | low | ✅ |
 | 103 | `get_recent_join_members` | `group_members`（recent_join） | 获取最近入群的成员列表。 | low | ✅ |
 | 104 | `get_group_honor` | `group_activity`（honor） | 获取群荣誉信息，包括龙王、群聊之火、群聊炽焰、冒尖小春笋、快乐源泉等荣誉称号及获得者。 | low | ✅ |
@@ -452,16 +452,16 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 268 | `update_custom_tool` |  | 覆盖更新模型自定义 JavaScript 工具并原子热加载；失败会恢复旧版本。 | 危险 |  |
 | 269 | `invoke_custom_tool` |  | 在当前工具调用链中立即执行已热加载的模型自定义工具，解决当前模型客户端工具列表尚未重建的问… | 危险 |  |
 | 270 | `delete_custom_tool` |  | 删除模型自定义 JavaScript 工具并热加载；失败会恢复原文件。 | 危险 |  |
-| 271 | `mute_member` | `group_admin`（mute / unmute） | 禁言群成员，支持单个或批量禁言（需要管理员权限） | 危险 | 🆕 |
-| 272 | `kick_member` | `group_admin`（kick、blacklist） | 踢出群成员，支持单个或批量踢人（需要管理员权限） | 危险 | 🆕 |
+| 271 | `mute_member` | `group_admin`（mute / unmute） | 禁言群成员，支持单个或批量禁言（需要管理员权限） | 危险 | ✅ |
+| 272 | `kick_member` | `group_admin`（kick、blacklist） | 踢出群成员，支持单个或批量踢人（需要管理员权限） | 危险 | ✅ |
 | 273 | `set_group_card` | `group_admin`（set_card） | 设置群成员名片，支持单个或批量设置 | 危险 | ✅ |
 | 274 | `set_group_whole_ban` | `group_admin`（mute_all） | 设置全群禁言（需要管理员权限） | 危险 | ✅ |
 | 275 | `set_group_admin` |  | 设置/取消群管理员，支持单个或批量设置（需要群主权限） | 危险 |  |
-| 276 | `set_group_name` | `group_admin`（set_group_name） | 修改群名称（需要管理员权限） | 危险 | 🆕 |
+| 276 | `set_group_name` | `group_admin`（set_group_name） | 修改群名称（需要管理员权限） | 危险 | ✅ |
 | 277 | `set_group_special_title` | `group_admin`（set_title） | 设置群成员专属头衔，支持单个或批量设置（需要群主权限） | 危险 | ✅ |
 | 278 | `send_group_notice` |  | 发送群公告（需要管理员权限） | 危险 |  |
 | 279 | `delete_group_notice` |  | 删除群公告（需要管理员权限） | 危险 |  |
-| 280 | `set_group_add_request` | `join_request`（approve / reject） | 处理加群申请 | 危险 | 🆕 |
+| 280 | `set_group_add_request` | `join_request`（approve / reject） | 处理加群申请 | 危险 | ✅ |
 | 281 | `set_friend_add_request` |  | 处理好友申请 | 危险 |  |
 | 282 | `get_group_muted_list` |  | 获取群禁言列表 | low |  |
 | 283 | `set_group_leave` | `bot_account`（quit_group） | 退出群聊（需谨慎使用） | 危险 | 🆕 |
@@ -470,7 +470,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 286 | `get_group_at_all_remain` |  | 获取群@全体成员剩余次数 | low |  |
 | 287 | `set_group_anonymous_ban` |  | 禁言群匿名成员 | 危险 |  |
 | 288 | `set_group_anonymous` |  | 设置群匿名功能开关 | 危险 |  |
-| 289 | `get_group_system_msg` | `join_request`（list） | 获取群系统消息（加群请求、邀请等） | low | 🆕 |
+| 289 | `get_group_system_msg` | `join_request`（list） | 获取群系统消息（加群请求、邀请等） | low | ✅ |
 | 290 | `execute_command` | `shell` | 执行 Shell 命令。 | 危险 | ✅ |
 | 291 | `get_system_info` | `shell` | 获取系统信息，包括操作系统、CPU、内存、磁盘等 | low | ✅ |
 | 292 | `get_process_info` | `shell` | 获取当前 Node.js 进程信息 | low | ✅ |

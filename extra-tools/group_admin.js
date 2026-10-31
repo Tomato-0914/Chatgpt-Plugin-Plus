@@ -185,11 +185,15 @@ async function locateRecall (e, bot, gid, args) {
     }
   }
 
-  if (!userId && !keyword) throw new Error('请引用要撤回的消息，或提供 user_id（谁发的）/ keyword（内容关键词）')
-  // user_id 写 bot 时撤回野生号自己发的消息（官方机器人的在前面已经处理）
-  const users = userId === 'bot' ? [String(bot.uin)] : userId ? [userId] : null
+  if (!userId && !keyword) throw new Error('请引用要撤回的消息，或提供 user_id（谁发的，all 为不分是谁）/ keyword（内容关键词）')
+  // user_id：bot 为野生号自己发的（官方机器人的在前面已经处理）；all 为不分是谁发的（不含机器人）；多个 QQ 号用逗号分隔
+  const all = /^(all|全部|所有人)$/i.test(userId)
+  const users = userId === 'bot' ? [String(bot.uin)] : userId && !all ? userId.split(/[,，\s]+/).filter(Boolean) : null
+  const bots = grp.botIds(e)
+  bots.add(String(bot.uin))
+  const filter = all || (!users && keyword) ? m => !bots.has(chat.senderOf(m)) : undefined
   // 不撤回发起这次请求的那条消息，以及之后机器人发的提示
-  const list = await chat.recentMessages(e, bot, gid, { users, keyword, count, scan: RECALL_SCAN })
+  const list = await chat.recentMessages(e, bot, gid, { users, keyword, count, filter, scan: RECALL_SCAN })
   if (!list.length) throw new Error(`最近 ${RECALL_SCAN} 条群消息里没有找到符合条件的消息`)
   return { group, targets: list.map(describe) }
 }
@@ -206,7 +210,7 @@ export class GroupAdminTool extends CustomTool {
       '操作对象要用 QQ 号：用户 @ 了人就用被 @ 的 QQ 号（只看到名字时用 chat_context 的 at 查）；不知道 QQ 号时（如“刚进群的那个人”“刚才刷屏的人”）' +
       '先用 group_members 的 recent_join（最近入群）、member_info（按名字搜）或 search_chat_history 查到 QQ 号再调用，不要编造 QQ 号，也不要直接回答做不到。' +
       '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的野生号；名片、群名称、全员禁言、撤回别人的消息要同群野生号是管理员，头衔需要野生号是群主（权限不够时工具会直接说明）。' +
-      '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
+      '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count（撤别人的就填别人的 QQ 号，几个人用逗号分隔；不分是谁、撤最近几条用 user_id=all），按内容撤回用 keyword；' +
       '撤回机器人自己发的消息时 user_id 写 bot（官方机器人自己的消息走官方接口撤回）。不要编造 message_id。',
     parameters: {
       type: 'object',
@@ -219,7 +223,8 @@ export class GroupAdminTool extends CustomTool {
         },
         user_id: {
           type: 'string',
-          description: '操作对象的 QQ 号（mute / unmute / kick / blacklist_add / blacklist_remove / set_card / set_title 必填）；recall 时表示撤回谁发的消息，写 bot 表示机器人自己'
+          description: '操作对象的 QQ 号（mute / unmute / kick / blacklist_add / blacklist_remove / set_card / set_title 必填）；' +
+            'recall 时表示撤回谁发的消息：一个或多个 QQ 号（逗号分隔），bot 为机器人自己，all 为不分是谁发的（最近 count 条，不含机器人）'
         },
         minutes: {
           type: 'number',

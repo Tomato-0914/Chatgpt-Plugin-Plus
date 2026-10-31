@@ -221,7 +221,7 @@ export async function decide (e, approve, id) {
     if (!item) {
       const old = done.get(id)
       if (!(old?.level === 'self' ? isRequester(e, old) : await isManager(e))) return null
-      return old ? '这条申请已经处理过了' : '这条申请已经失效（机器人重启过），请重新发起'
+      return old ? '这条申请已经处理过了' : '这条申请已失效，请重新发起'
     }
     if (item.chat !== chat) return null
   } else if (quoted.length) {

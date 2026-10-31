@@ -8,7 +8,8 @@ const grp = await import(pathToFileURL(path.resolve(dir, '_group.js')).href)
 const web = await import(pathToFileURL(path.resolve(dir, '_qqweb.js')).href)
 const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).href)
 
-const API = 'https://qun.qq.com/v2/luckyword/proxy/domain/qun.qq.com/cgi-bin/group_lucky_word'
+// 原来走 /v2/luckyword/proxy/domain/qun.qq.com/ 网关，这层前缀已经下线（直接 404），改为直连
+const API = 'https://qun.qq.com/cgi-bin/group_lucky_word'
 const QNAME = { 'qname-service': '976321:131072', 'qname-space': 'Production' }
 /** 今天已经抽过 */
 const DRAWN = 11004
