@@ -426,7 +426,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 242 | `get_qzone_feeds` |  | 获取QQ空间说说列表。 | low |  |
 | 243 | `like_qzone_post` |  | 点赞QQ空间说说。 | high |  |
 | 244 | `delete_qzone_mood` |  | 删除自己的QQ空间说说。 | 危险 |  |
-| 245 | `set_self_longnick` | `bot_account`（set_signature） | 设置机器人的个性签名/个人说明 | high | 🆕 |
+| 245 | `set_self_longnick` | `bot_account`（set_signature） | 设置机器人的个性签名/个人说明 | high | ✅ |
 | 246 | `friend_poke` |  | 戳一戳好友，兼容 icqq 和 NapCat/go-cqhttp | high |  |
 | 247 | `group_poke` |  | 在群里戳一戳某人，兼容 icqq 和 NapCat/go-cqhttp | high |  |
 | 248 | `get_profile_like` |  | 获取QQ资料卡点赞信息 | low |  |
