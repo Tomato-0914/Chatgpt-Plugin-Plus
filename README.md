@@ -279,10 +279,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 95 | `get_sign_in_today` | `group_activity`（sign_in） | 获取今日群打卡列表。 | low | ✅ |
 | 96 | `get_speak_rank` | `group_activity`（speak_rank） | 获取群发言排行榜。 | low | ✅ |
 | 97 | `get_group_data` | `group_activity`（data） | 获取群活跃数据统计，包括消息总数、活跃成员数、新增成员数、退群人数等。 | low | ✅ |
-| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | ✅ |
-| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | ✅ |
-| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | ✅ |
-| 101 | `switch_lucky` | 已去掉（QQ 接口返回 404，已下线） | 开启或关闭群幸运字符功能。 | high |  |
+| 98 | `get_lucky_list` | `lucky_word`（list） | 获取群幸运字符列表。 | low | 🆕 |
+| 99 | `draw_lucky` | `lucky_word`（draw） | 抽取幸运字符。 | high | 🆕 |
+| 100 | `equip_lucky` | `lucky_word`（equip） | 装备或更换幸运字符。 | high | 🆕 |
+| 101 | `switch_lucky` | `lucky_word`（switch） | 开启或关闭群幸运字符功能。 | high | 🆕 |
 | 102 | `get_inactive_members` | `group_members`（inactive） | 获取群内不活跃成员列表。 | low | ✅ |
 | 103 | `get_recent_join_members` | `group_members`（recent_join） | 获取最近入群的成员列表。 | low | ✅ |
 | 104 | `get_group_honor` | `group_activity`（honor） | 获取群荣誉信息，包括龙王、群聊之火、群聊炽焰、冒尖小春笋、快乐源泉等荣誉称号及获得者。 | low | ✅ |
