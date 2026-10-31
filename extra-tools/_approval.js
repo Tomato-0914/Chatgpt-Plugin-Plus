@@ -85,12 +85,13 @@ async function approvers (e, level, list) {
 
 /**
  * 官方机器人的确认 / 拒绝按钮（野生号发按钮会报错，不发）。
- * QQBot-Plugin 的回调按钮 5 分钟后失效，指令同时写进 action.data，超时、重启后点击照样发出指令
+ * QQBot-Plugin 的回调按钮 5 分钟后失效，指令同时写进 action.data，超时、重启后点击照样发出指令。
+ * 点过的按钮在 QQ 里只显示自己点过，点了「确认」再点「拒绝」不能显示成已确认，所以点后都显示「已处理」，结果看回复
  */
 function buttons (e, id, permission) {
   if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function' || !permission.length) return []
   const button = (text, clicked, cmd) => ({ text, clicked_text: clicked, callback: cmd, permission: permission.map(asId), QQBot: { action: { data: cmd } } })
-  return [globalThis.segment.button([button('✅ 确认', '已确认', `#确认 ${id}`), button('❌ 拒绝', '已拒绝', `#拒绝 ${id}`)])]
+  return [globalThis.segment.button([button('✅ 确认', '已处理', `#确认 ${id}`), button('❌ 拒绝', '已处理', `#拒绝 ${id}`)])]
 }
 
 /** 发送结果里的消息 ID（官方机器人是数组，野生号是一个；ICQQ 还有 seq），用来对应引用回复 */
