@@ -18,6 +18,7 @@ const isGroupAdmin = role => role === 'owner' || role === 'admin'
 
 /** 常见错误码换成能看懂的说明 */
 const ERRORS = [
+  [/11253/, '官方机器人没有开通这个接口（需要向 QQ 开放平台申请内邀权限），这个操作做不了'],
   [/NOT_GROUP_ADMIN|not.*admin|权限不足|无权限|permission/i, '机器人不是群管理员'],
   [/40062003/, '官方机器人只能撤回自己发的消息'],
   [/OWNER|群主/i, '对方是群主或管理员，机器人没有权限']
