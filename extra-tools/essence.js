@@ -48,13 +48,8 @@ function normalize (m) {
   }
 }
 
-/** 精华消息列表（每次现查）：OneBot 的 get_essence_msg_list，ICQQ 用网页接口 */
-async function essenceList (bot, gid) {
-  if (typeof bot.sendApi === 'function') {
-    const ret = await chat.invoke([[bot, 'sendApi', ['get_essence_msg_list', { group_id: Number(gid) }]]], '查看精华消息')
-    const raw = Array.isArray(ret) ? ret : Array.isArray(ret?.list) ? ret.list : []
-    return raw.map(normalize)
-  }
+/** QQ 网页版的精华列表（带消息内容） */
+async function webList (bot, gid) {
   const cred = await web.credentials(bot, 'qun.qq.com')
   const list = []
   for (let page = 0; page < 5; page++) {
@@ -62,6 +57,35 @@ async function essenceList (bot, gid) {
     for (const m of ret.data?.msg_list || []) list.push(normalize(m))
     if (ret.data?.is_end !== false) break
   }
+  return list
+}
+
+/**
+ * 协议端的列表没带消息内容时（有的只给序号、发送人、设置人等几个字段）补上内容：
+ * 先按消息序号对 QQ 网页版的精华列表，再对群消息记录；都拿不到就保持没有内容
+ */
+async function fillText (bot, gid, list) {
+  const missing = list.filter(i => !i.text && i.seq !== undefined && i.seq !== null)
+  if (!missing.length) return
+  const fill = (key, text) => { for (const i of missing) if (!i.text && String(i.seq) === key && text) i.text = text }
+  try {
+    for (const w of await webList(bot, gid)) if (w.seq !== undefined && w.seq !== null) fill(String(w.seq), w.text)
+  } catch {}
+  if (!missing.some(i => !i.text)) return
+  try {
+    for (const m of await chat.fetchHistory(bot, gid, chat.SCAN)) {
+      for (const seq of [m.real_seq, m.message_seq, m.seq]) if (seq !== undefined && seq !== null) fill(String(seq), chat.textOf(m))
+    }
+  } catch {}
+}
+
+/** 精华消息列表（每次现查）：OneBot 的 get_essence_msg_list，ICQQ 用网页接口；withText 为 false 时不补内容（只核对在不在） */
+async function essenceList (bot, gid, { withText = true } = {}) {
+  if (typeof bot.sendApi !== 'function') return await webList(bot, gid)
+  const ret = await chat.invoke([[bot, 'sendApi', ['get_essence_msg_list', { group_id: Number(gid) }]]], '查看精华消息')
+  const raw = Array.isArray(ret) ? ret : Array.isArray(ret?.list) ? ret.list : []
+  const list = raw.map(normalize)
+  if (withText) await fillText(bot, gid, list)
   return list
 }
 
@@ -134,7 +158,7 @@ async function webCancel (bot, gid, item) {
 
 /** 取消后还在不在精华列表里（按消息 ID 或序号对）；查不了列表时当作还在 */
 async function stillEssence (bot, gid, item) {
-  const list = await essenceList(bot, gid).catch(() => null)
+  const list = await essenceList(bot, gid, { withText: false }).catch(() => null)
   return !list || list.some(i => sameItem(i, item))
 }
 
@@ -245,7 +269,9 @@ export class EssenceTool extends CustomTool {
         return `${i + 1}. ${m.sender || '未知'}：${preview(m.text)}${extra ? `（${extra}）` : ''}`
       })
       // 发送人、内容都没解析出来：多半是协议端的字段名不一样，把字段名带上方便排查
-      const unknown = list.every(m => !m.sender && !m.text) ? `\n（没有解析出发送人和内容，接口返回的字段：${list[0].keys.join('、')}）` : ''
+      const unknown = list.every(m => !m.sender && !m.text)
+        ? `\n（没有解析出发送人和内容，接口返回的字段：${list[0].keys.join('、')}）`
+        : list.every(m => !m.text) ? '\n（协议端的精华列表不带消息内容，QQ 网页版接口和最近的群消息记录里也没找到，只能显示发送人）' : ''
       return `共 ${list.length} 条精华消息${list.length > limit ? `，显示最近 ${limit} 条` : ''}（序号可以用于取消，1 是最近设置的）：\n${lines.join('\n')}${unknown}`
     } catch (err) {
       return chat.errorText(err)

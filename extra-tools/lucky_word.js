@@ -6,14 +6,11 @@ const dir = './plugins/chatgpt-plugin/extra-tools'
 const chat = await import(pathToFileURL(path.resolve(dir, '_chat.js')).href)
 const grp = await import(pathToFileURL(path.resolve(dir, '_group.js')).href)
 const web = await import(pathToFileURL(path.resolve(dir, '_qqweb.js')).href)
-const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).href)
 
 const API = 'https://qun.qq.com/v2/luckyword/proxy/domain/qun.qq.com/cgi-bin/group_lucky_word'
 const QNAME = { 'qname-service': '976321:131072', 'qname-space': 'Production' }
 /** 今天已经抽过 */
 const DRAWN = 11004
-/** 已经是开启 / 关闭状态 */
-const SAME_STATE = 11111
 
 const word = w => {
   const info = w?.word_info || w || {}
@@ -39,22 +36,18 @@ export class LuckyWordTool extends CustomTool {
   function = {
     name: 'lucky_word',
     description: 'QQ 群幸运字符（机器人自己账号的，需要同群的野生号）：查看机器人拥有和正在佩戴的字符（list）、' +
-      '每天抽一次字符（draw）、佩戴某个字符（equip）、开启或关闭本群的幸运字符功能（switch，需要机器人是管理员；主人、群主、管理员要求时直接执行，其他人要求时会申请确认，告诉用户等确认即可）。',
+      '每天抽一次字符（draw）、佩戴某个字符（equip）。开关本群幸运字符功能的 QQ 接口已经下线，做不了，用户要求时告诉他在 QQ 群设置里手动开关。',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'draw', 'equip', 'switch'],
-          description: 'list=字符列表（默认）；draw=抽字符；equip=佩戴字符；switch=开关群幸运字符'
+          enum: ['list', 'draw', 'equip'],
+          description: 'list=字符列表（默认）；draw=抽字符；equip=佩戴字符'
         },
         word: {
           type: 'string',
           description: 'action=equip 时要佩戴的字符文字或 word_id（从 list 里拿）'
-        },
-        enable: {
-          type: 'boolean',
-          description: 'action=switch 时 true 开启、false 关闭'
         },
         group_id: {
           type: 'string',
@@ -91,22 +84,6 @@ export class LuckyWordTool extends CustomTool {
         const error = web.failure(ret)
         if (error) throw new Error(error)
         return `已佩戴幸运字符「${w.text}」`
-      }
-
-      if (args.action === 'switch') {
-        if (typeof args.enable !== 'boolean') return '请说明是开启还是关闭幸运字符'
-        // 开关会影响全群，属于群管级：主人、群主、管理员直接执行，其他人要他们确认
-        return await approval.guard(e, {
-          level: 'manager',
-          title: `${args.enable ? '开启' : '关闭'}本群的幸运字符`,
-          run: async () => {
-            const ret = await post(bot, 'setting', { group_code: String(gid), cmd: args.enable ? 1 : 2 })
-            if (ret?.retcode === SAME_STATE) return `幸运字符本来就是${args.enable ? '开启' : '关闭'}的`
-            const error = web.failure(ret)
-            if (error) throw new Error(`${error}，开关幸运字符需要机器人是群管理员`)
-            return `已${args.enable ? '开启' : '关闭'}本群的幸运字符`
-          }
-        })
       }
 
       const { list, equipped } = await words(bot, gid)
