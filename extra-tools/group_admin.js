@@ -14,6 +14,11 @@ const RECALL_SCAN = 200
 const NEEDS_USER = new Set(['mute', 'unmute', 'kick', 'set_card', 'set_title', 'blacklist_add', 'blacklist_remove'])
 /** 对人“动手”的操作：不能对主人做（主人自己除外），管理员不能对群主、其他管理员做 */
 const HOSTILE = new Set(['mute', 'kick', 'set_card', 'set_title', 'blacklist_add'])
+/**
+ * 对发起者自己做时只和他本人有关的操作（禁言自己、踢自己、改自己的名片；撤回自己的消息另外判断）：
+ * 归为本人级，谁发起都要他本人确认，其他人（包括主人）不能代为确认
+ */
+const SELF_OK = new Set(['mute', 'kick', 'set_card'])
 const isGroupAdmin = role => role === 'owner' || role === 'admin'
 
 /** 常见错误码换成能看懂的说明 */
@@ -167,6 +172,7 @@ async function locateRecall (e, bot, gid, args) {
 
   const describe = m => ({
     id: m.message_id,
+    user: String(m.user_id ?? m.sender?.user_id ?? ''),
     desc: `${m.sender?.card || m.sender?.nickname || ''}(${m.user_id ?? m.sender?.user_id})：${preview(chat.textOf(m))}`
   })
 
@@ -194,7 +200,8 @@ export class GroupAdminTool extends CustomTool {
   function = {
     name: 'group_admin',
     description: '群管理：禁言、解除禁言、踢人、群黑名单（查看、拉黑、移出）、改群名片、设专属头衔、全员禁言、撤回消息。' +
-      '主人、本群群主、管理员要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人或本群群主、管理员确认后才执行（告诉用户等确认即可）。' +
+      '对别人的操作：主人、本群群主、管理员要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人或本群群主、管理员确认后才执行（告诉用户等确认即可）。' +
+      '对发起者自己的操作（“禁言我”“把我踢了”“撤回我刚才的消息”“改我的名片”）：user_id 填发起者自己的 QQ 号，谁发起都会先发确认消息，只有他本人能确认（主人也不能代为确认），告诉他自己确认即可。' +
       '不能对主人、机器人自己操作；管理员不能对群主、其他管理员操作。' +
       '操作对象要用 QQ 号：用户 @ 了人就用被 @ 的 QQ 号（只看到名字时用 chat_context 的 at 查）；不知道 QQ 号时（如“刚进群的那个人”“刚才刷屏的人”）' +
       '先用 group_members 的 recent_join（最近入群）、member_info（按名字搜）或 search_chat_history 查到 QQ 号再调用，不要编造 QQ 号，也不要直接回答做不到。' +
@@ -267,6 +274,10 @@ export class GroupAdminTool extends CustomTool {
     }
     const target = chat.asId(uid)
     const text = String(args.text ?? '').trim()
+    // 对象是发起者自己：本人级；对别人：群管级
+    const self = SELF_OK.has(action) && uid === String(e.user_id)
+    let level = self ? 'self' : 'manager'
+    const who = self ? '你自己' : uid
 
     // 名片、头衔、全员禁言官方机器人没有接口，只能交给同群野生号
     const needWild = () => (wg ? null : '这个群里没有野生号，官方机器人没有改名片、设头衔、全员禁言的接口')
@@ -275,7 +286,7 @@ export class GroupAdminTool extends CustomTool {
     switch (action) {
       case 'mute': {
         const minutes = Math.min(Math.max(Math.floor(Number(args.minutes) || 10), 1), MAX_MUTE_MINUTES)
-        title = `禁言 ${uid} ${minutes} 分钟`
+        title = `禁言 ${who} ${minutes} 分钟`
         run = () => tryEach([
           og && ['官方机器人', () => og.muteMember(target, minutes * 60)],
           wg && ['野生号', () => wg.muteMember(target, minutes * 60)]
@@ -291,7 +302,7 @@ export class GroupAdminTool extends CustomTool {
         break
       case 'kick': {
         const block = Boolean(args.reject_add)
-        title = `把 ${uid} 踢出群${block ? '并拉黑（不能再加群）' : ''}`
+        title = `把 ${who} 踢出群${block ? '并拉黑（不能再加群）' : ''}`
         run = () => tryEach([
           og && ['官方机器人', () => og.kickMember(target, block)],
           wg && ['野生号', () => wildKick(wild, wg, target, block)]
@@ -324,7 +335,7 @@ export class GroupAdminTool extends CustomTool {
       }
       case 'set_card':
         if (needWild()) return needWild()
-        title = text ? `把 ${uid} 的群名片改成「${text.slice(0, 60)}」` : `清除 ${uid} 的群名片`
+        title = text ? `把 ${who} 的群名片改成「${text.slice(0, 60)}」` : `清除 ${who} 的群名片`
         run = () => call(() => wg.setCard(target, text.slice(0, 60)))
         break
       case 'set_title':
@@ -348,6 +359,8 @@ export class GroupAdminTool extends CustomTool {
           return `撤回失败：${err.message}`
         }
         if (typeof recallGroup?.recallMsg !== 'function') return '当前机器人不支持撤回消息'
+        // 要撤的全是发起者自己的消息：本人级
+        if (targets.every(t => t.user && t.user === String(e.user_id))) level = 'self'
 
         // 申请确认时把要撤的消息列出来，看清楚再确认
         title = targets.length === 1
@@ -375,12 +388,13 @@ export class GroupAdminTool extends CustomTool {
     }
     if (['mute', 'unmute', 'kick'].includes(action) && !og && !wg) return '没有能执行的机器人：官方机器人不是群管理员，这个群里也没有野生号'
 
+    if (self) title = title.replace(/\s*你自己\s*/, '你自己').replace(/你自己(\d)/, '你自己 $1')
     // 结果里只带标题第一行（多条撤回时后面是消息列表）
     const head = title.split('\n')[0].replace(/：$/, '')
     try {
       return await approval.guard(e, {
         title,
-        level: 'manager',
+        level,
         run: async () => {
           // 撤回部分失败时 run 返回说明文字；其他操作返回的是接口原始结果，不当作回复
           const result = await run()
