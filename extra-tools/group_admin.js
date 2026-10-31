@@ -149,10 +149,12 @@ async function locateRecall (e, bot, gid, args) {
   const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
   const keyword = String(args.keyword ?? '').trim().toLowerCase()
   const count = Math.min(Math.max(Math.floor(Number(args.count) || 1), 1), MAX_RECALL)
+  // 引用了消息、又没有要按关键词或多条撤回：就是撤被引用的那条（AI 顺手填的 user_id 不算）
+  const useQuote = Boolean(e.source) && !keyword && count === 1
 
   // 引用了官方机器人自己发的消息，或要撤回官方机器人自己的消息：走官方接口
   if (!chat.isWildBot(e.bot)) {
-    if (e.source && !userId && !keyword) {
+    if (useQuote) {
       const reply = await e.getReply?.().catch(() => null)
       if (reply?.message_id && (reply.direction === 'outgoing' || reply.sender?.bot)) {
         return { group: officialGroup(e), targets: [{ id: reply.message_id, desc: `${e.bot?.nickname || '机器人'}：${preview(String(reply.raw_message || ''))}` }] }
@@ -168,7 +170,7 @@ async function locateRecall (e, bot, gid, args) {
   })
 
   // 引用了一条消息并且没有给其他条件：撤回被引用的那条（官方机器人收到的引用到野生号的消息记录里找同一条）
-  if (e.source && !userId && !keyword) {
+  if (useQuote) {
     try {
       return { group, targets: [describe(await chat.quotedMessage(e, bot, gid, { scan: RECALL_SCAN }))] }
     } catch (err) {
@@ -193,6 +195,8 @@ export class GroupAdminTool extends CustomTool {
     description: '群管理：禁言、解除禁言、踢人、群黑名单（查看、拉黑、移出）、改群名片、设专属头衔、全员禁言、撤回消息。' +
       '主人、本群群主、管理员要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人或本群群主、管理员确认后才执行（告诉用户等确认即可）。' +
       '不能对主人、机器人自己操作；管理员不能对群主、其他管理员操作。' +
+      '操作对象要用 QQ 号：用户 @ 了人就用被 @ 的 QQ 号；不知道 QQ 号时（如“刚进群的那个人”“刚才刷屏的人”）先用 group_members（recent_join 最近入群、list 成员列表里按名字找）' +
+      '或 search_chat_history 查到 QQ 号再调用，不要编造 QQ 号，也不要直接回答做不到。' +
       '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的野生号；名片、头衔、全员禁言、撤回别人的消息要同群野生号是管理员，头衔需要群主。' +
       '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
       '撤回机器人自己发的消息时 user_id 写 bot（官方机器人自己的消息走官方接口撤回）。不要编造 message_id。',
