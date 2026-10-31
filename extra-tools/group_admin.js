@@ -199,13 +199,13 @@ export class GroupAdminTool extends CustomTool {
 
   function = {
     name: 'group_admin',
-    description: '群管理：禁言、解除禁言、踢人、群黑名单（查看、拉黑、移出）、改群名片、设专属头衔、全员禁言、撤回消息。' +
+    description: '群管理：禁言、解除禁言、踢人、群黑名单（查看、拉黑、移出）、改群名片、设专属头衔、改群名称、全员禁言、撤回消息。' +
       '对别人的操作：主人、本群群主、管理员要求时直接执行；其他人要求时会自动 @ 主人申请确认，主人或本群群主、管理员确认后才执行（告诉用户等确认即可）。' +
       '对发起者自己的操作（“禁言我”“把我踢了”“撤回我刚才的消息”“改我的名片”）：user_id 填发起者自己的 QQ 号，谁发起都会先发确认消息，只有他本人能确认（主人也不能代为确认），告诉他自己确认即可。' +
       '不能对主人、机器人自己操作；管理员不能对群主、其他管理员操作。' +
       '操作对象要用 QQ 号：用户 @ 了人就用被 @ 的 QQ 号（只看到名字时用 chat_context 的 at 查）；不知道 QQ 号时（如“刚进群的那个人”“刚才刷屏的人”）' +
       '先用 group_members 的 recent_join（最近入群）、member_info（按名字搜）或 search_chat_history 查到 QQ 号再调用，不要编造 QQ 号，也不要直接回答做不到。' +
-      '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的野生号；名片、头衔、全员禁言、撤回别人的消息要同群野生号是管理员，头衔需要群主。' +
+      '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的野生号；名片、群名称、全员禁言、撤回别人的消息要同群野生号是管理员，头衔需要野生号是群主（权限不够时工具会直接说明）。' +
       '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count，按内容撤回用 keyword；' +
       '撤回机器人自己发的消息时 user_id 写 bot（官方机器人自己的消息走官方接口撤回）。不要编造 message_id。',
     parameters: {
@@ -213,9 +213,9 @@ export class GroupAdminTool extends CustomTool {
       properties: {
         action: {
           type: 'string',
-          enum: ['mute', 'unmute', 'kick', 'blacklist', 'blacklist_add', 'blacklist_remove', 'set_card', 'set_title', 'mute_all', 'unmute_all', 'recall'],
+          enum: ['mute', 'unmute', 'kick', 'blacklist', 'blacklist_add', 'blacklist_remove', 'set_card', 'set_title', 'set_group_name', 'mute_all', 'unmute_all', 'recall'],
           description: 'mute=禁言，unmute=解除禁言，kick=踢出群，blacklist=查看群黑名单，blacklist_add=加入群黑名单（不能再加群），blacklist_remove=移出群黑名单，' +
-            'set_card=改群名片，set_title=设专属头衔，mute_all/unmute_all=开关全员禁言，recall=撤回消息'
+            'set_card=改群名片，set_title=设专属头衔，set_group_name=改群名称，mute_all/unmute_all=开关全员禁言，recall=撤回消息'
         },
         user_id: {
           type: 'string',
@@ -227,7 +227,7 @@ export class GroupAdminTool extends CustomTool {
         },
         text: {
           type: 'string',
-          description: 'set_card 的新名片，或 set_title 的头衔（为空表示清除）'
+          description: 'set_card 的新名片，set_title 的头衔（为空表示清除），或 set_group_name 的新群名称'
         },
         keyword: {
           type: 'string',
@@ -279,8 +279,18 @@ export class GroupAdminTool extends CustomTool {
     let level = self ? 'self' : 'manager'
     const who = self ? '你自己' : uid
 
-    // 名片、头衔、全员禁言官方机器人没有接口，只能交给同群野生号
-    const needWild = () => (wg ? null : '这个群里没有野生号，官方机器人没有改名片、设头衔、全员禁言的接口')
+    // 名片、头衔、群名称、全员禁言官方机器人没有接口，只能交给同群野生号
+    const needWild = () => (wg ? null : '这个群里没有野生号，官方机器人没有改名片、设头衔、改群名称、全员禁言的接口')
+    /**
+     * 野生号的群权限够不够：改名片、改群名称、全员禁言至少要管理员，设头衔要群主。
+     * 不够时直接说明，不发申请（确认了也做不了）；查不到身份时照样执行，接口会报错
+     */
+    const needRole = async (min, what) => {
+      const role = await grp.botRole(wild, gid)
+      if (!role) return null
+      if (min === 'owner' ? role === 'owner' : role === 'owner' || role === 'admin') return null
+      return `野生号在这个群${role === 'admin' ? '是管理员' : '不是管理员'}，${what}需要它是${min === 'owner' ? '群主' : '群主或管理员'}`
+    }
 
     let title, run
     switch (action) {
@@ -333,22 +343,41 @@ export class GroupAdminTool extends CustomTool {
         }
         break
       }
-      case 'set_card':
+      case 'set_card': {
         if (needWild()) return needWild()
+        const denied = await needRole('admin', '改群名片')
+        if (denied) return denied
         title = text ? `把 ${who} 的群名片改成「${text.slice(0, 60)}」` : `清除 ${who} 的群名片`
         run = () => call(() => wg.setCard(target, text.slice(0, 60)))
         break
-      case 'set_title':
+      }
+      case 'set_title': {
         if (needWild()) return needWild()
+        const denied = await needRole('owner', '设专属头衔')
+        if (denied) return denied
         title = text ? `给 ${uid} 设置头衔「${text.slice(0, 18)}」` : `清除 ${uid} 的头衔`
         run = () => call(() => wg.setTitle(target, text.slice(0, 18)))
         break
-      case 'mute_all':
-      case 'unmute_all':
+      }
+      case 'set_group_name': {
         if (needWild()) return needWild()
+        const name = text.slice(0, 30)
+        if (!name) return '请提供新的群名称'
+        const denied = await needRole('admin', '改群名称')
+        if (denied) return denied
+        title = `把群名称改成「${name}」`
+        run = () => call(() => wg.setName(name))
+        break
+      }
+      case 'mute_all':
+      case 'unmute_all': {
+        if (needWild()) return needWild()
+        const denied = await needRole('admin', '开关全员禁言')
+        if (denied) return denied
         title = action === 'mute_all' ? '开启全员禁言' : '关闭全员禁言'
         run = () => call(() => wg.muteAll(action === 'mute_all'))
         break
+      }
       case 'recall': {
         const bot = adminBot(e)
         if (!bot?.pickGroup) return '没有可以撤回消息的机器人'
@@ -383,7 +412,7 @@ export class GroupAdminTool extends CustomTool {
       default:
         return 'action 不正确'
     }
-    for (const [name, method] of [['set_card', 'setCard'], ['set_title', 'setTitle'], ['mute_all', 'muteAll'], ['unmute_all', 'muteAll']]) {
+    for (const [name, method] of [['set_card', 'setCard'], ['set_title', 'setTitle'], ['set_group_name', 'setName'], ['mute_all', 'muteAll'], ['unmute_all', 'muteAll']]) {
       if (name === action && typeof wg[method] !== 'function') return '野生号不支持这个群管理操作'
     }
     if (['mute', 'unmute', 'kick'].includes(action) && !og && !wg) return '没有能执行的机器人：官方机器人不是群管理员，这个群里也没有野生号'
