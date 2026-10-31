@@ -10,8 +10,8 @@
  *     不引用时只有一条待处理才处理它，有多条时提示引用或点按钮，不猜
  *   - 申请一直有效，直到有权限的人处理；没有权限的人点按钮、回复 Y / N 都无效（不处理，申请照旧有效）；
  *     处理过的申请再点、再回复只会提示已经处理过，不会重复执行
- *   - 按钮在 QQ 里只有有权限的人能点：主人级只给主人；群管级给主人加本群群主和管理员，
- *     拿不到群管名单时只给主人（群主、管理员可以引用申请回复），绝不放给所有人
+ *   - 按钮在 QQ 里只有有权限的人能点：主人级只给主人；群管级用 QQ 自带的「仅管理者」（群主、管理员），
+ *     有主人不是本群群管时再加一行只给主人的按钮，绝不放给所有人
  * 主人按云崽的规则判定：other.yaml 的 master 里当前机器人名下的账号（e.isMaster），masterQQ 不算。
  * 执行的内容在申请时就已经确定，确认时不能被换成别的。申请存在内存里，重启后失效。
  * 确认命令由 apps/extraTools.js 处理。以 _ 开头，不会被当成工具登记。
@@ -71,13 +71,11 @@ function newId () {
   return id
 }
 
-/** 能点按钮的人：主人级只有主人；群管级是主人加本群群主、管理员，拿不到群管名单时只有主人 */
-async function approvers (e, level, list) {
-  if (level !== 'manager') return list
+/** 主人里不是本群群主、管理员的（点不了「仅管理者」按钮，要单独给一行）；拿不到群成员名单时当作都不是 */
+async function mastersNotAdmin (e, list) {
   try {
-    const admins = (await grp.members(e.group)).filter(m => isGroupAdmin(m.role)).map(m => String(m.user_id))
-    const bots = grp.botIds(e)
-    return [...new Set([...list, ...admins.filter(id => !bots.has(id))])]
+    const admins = new Set((await grp.members(e.group)).filter(m => isGroupAdmin(m.role)).map(m => String(m.user_id)))
+    return admins.size ? list.filter(id => !admins.has(id)) : list
   } catch {
     return list
   }
@@ -85,13 +83,25 @@ async function approvers (e, level, list) {
 
 /**
  * 官方机器人的确认 / 拒绝按钮（野生号发按钮会报错，不发）。
+ * 主人级只给主人点；群管级第一行用 QQ 自带的「仅管理者」权限（admin，QQ 自己判定群主、管理员，
+ * 不需要他们绑定 QQ 号——指定用户的名单要换成 openid，没绑定的管理员换不了，会点不了），
+ * 有主人不是本群群管时再加一行只给主人的按钮。
  * QQBot-Plugin 的回调按钮 5 分钟后失效，指令同时写进 action.data，超时、重启后点击照样发出指令。
  * 点过的按钮在 QQ 里只显示自己点过，点了「确认」再点「拒绝」不能显示成已确认，所以点后都显示「已处理」，结果看回复
  */
-function buttons (e, id, permission) {
-  if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function' || !permission.length) return []
-  const button = (text, clicked, cmd) => ({ text, clicked_text: clicked, callback: cmd, permission: permission.map(asId), QQBot: { action: { data: cmd } } })
-  return [globalThis.segment.button([button('✅ 确认', '已处理', `#确认 ${id}`), button('❌ 拒绝', '已处理', `#拒绝 ${id}`)])]
+function buttons (e, id, rows) {
+  if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function') return []
+  const button = (text, cmd, permission) => ({ text, clicked_text: '已处理', callback: cmd, permission, QQBot: { action: { data: cmd } } })
+  const out = rows.filter(r => r.permission === 'admin' || r.permission.length)
+    .map(r => [button(`✅ 确认${r.tag}`, `#确认 ${id}`, r.permission), button(`❌ 拒绝${r.tag}`, `#拒绝 ${id}`, r.permission)])
+  return out.length ? [globalThis.segment.button(...out)] : []
+}
+
+/** 按钮的行：[{ permission, tag }] */
+async function buttonRows (e, level, list) {
+  if (level !== 'manager') return [{ permission: list.map(asId), tag: '' }]
+  const extra = await mastersNotAdmin(e, list)
+  return [{ permission: 'admin', tag: '' }, ...(extra.length ? [{ permission: extra.map(asId), tag: '（主人）' }] : [])]
 }
 
 /** 发送结果里的消息 ID（官方机器人是数组，野生号是一个；ICQQ 还有 seq），用来对应引用回复 */
@@ -136,7 +146,7 @@ export async function guard (e, { title, run, level = 'master' }) {
     const first = asId(list[0])
     let ret
     if (e.isGroup || e.group_id) {
-      const btn = buttons(e, id, await approvers(e, level, list))
+      const btn = buttons(e, id, await buttonRows(e, level, list))
       // 官方机器人发 Markdown（带按钮），野生号发普通文字
       const body = btn.length
         ? { type: 'markdown', data: `\n**${head}**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n${who}点按钮，或引用这条消息回复「#确认」/ Y 执行、「#拒绝」/ N 取消` }
@@ -156,10 +166,16 @@ export async function guard (e, { title, run, level = 'master' }) {
 
 /** 能不能处理这条申请：主人级要主人；群管级要主人，或申请所在群的群主、管理员 */
 async function canDecide (e, item) {
+  // 官方机器人的按钮点击：QQ 已经按按钮的权限（仅管理者 / 指定的主人）放行；点击事件里没有群身份，
+  // 没绑定 QQ 号的管理员也查不到身份，这里直接认可。手打的同样指令是普通消息，不算
+  if (isButtonClick(e)) return true
   if (e?.isMaster) return true
   if (item.level !== 'manager') return false
   return String(e.group_id) === String(item.group_id) && isGroupAdmin(await grp.requesterRole(e))
 }
+
+/** QQBot-Plugin 把按钮点击转成的消息事件（sub_type 为 callback，带着原始的互动事件） */
+const isButtonClick = e => e?.bot?.adapter?.id === 'QQBot' && e.sub_type === 'callback' && Boolean(e.raw?.data?.resolved)
 
 function finish (item, text) {
   pending.delete(item.id)
@@ -202,7 +218,8 @@ export async function decide (e, approve, id) {
   // 没有权限：无效，不处理，申请照旧有效
   if (!(await canDecide(e, item))) return null
 
-  const by = `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})`
+  // 没绑定 QQ 号的管理员点按钮时只有 openid
+  const by = /^\d{5,12}$/.test(String(e.user_id)) ? `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})` : (e.sender?.card || e.sender?.nickname || '管理员')
   if (!approve) {
     finish(item, 'rejected')
     return `${by} 已拒绝 ${item.requester} 的请求：${item.title}`
