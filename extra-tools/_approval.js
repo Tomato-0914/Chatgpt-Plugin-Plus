@@ -1,36 +1,60 @@
 /**
- * 风险操作的主人确认
+ * 风险操作的确认（分两级）
  *
- * 主人发起的操作直接执行；其他人发起时不执行，先 @ 主人申请确认：
- *   - 主人回复「#确认」/「yes」/「Y」执行，「#拒绝」/「no」/「N」作废（不区分大小写），处理的是当前聊天里最近的一条申请；
- *     5 分钟内没有确认自动作废
- *   - 官方机器人的申请消息带「确认」「拒绝」两个回调按钮，按钮只允许主人点；按钮里带着这条申请的编号，
- *     有多条申请时点哪条的按钮就处理哪条
- *   - 只 @（私聊时只私信）第一个主人，避免打扰所有主人；所有主人都可以确认、点按钮
- * 执行的内容在申请时就已经确定，确认时不能被换成别的。确认命令由 apps/extraTools.js 处理。
- * 以 _ 开头，不会被当成工具登记。
+ * - 主人级（master）：shell、机器人账号、给别人 / 别的群发消息等，只有主人能执行、能批准
+ * - 群管级（manager）：入群申请、禁言、踢人、精华、群文件等群内管理，主人和本群的群主、管理员都能执行、能批准
+ *
+ * 有权限的人发起时直接执行；其他人发起时不执行，先 @ 第一个主人发一条申请（官方机器人发 Markdown + 按钮，野生号发文字）：
+ *   - 回复「#确认」/「yes」/「Y」执行，「#拒绝」/「no」/「N」作废（不区分大小写）
+ *   - 处理哪一条：点按钮就是按钮所在的那条（按钮带着申请编号）；引用某条申请回复就是被引用的那条；
+ *     不引用时只有一条待处理才处理它，有多条时提示引用或点按钮，不猜
+ *   - 申请一直有效，直到有权限的人处理；没有权限的人点按钮、回复 Y / N 都无效（不处理，申请照旧有效）；
+ *     处理过的申请再点、再回复只会提示已经处理过，不会重复执行
+ *   - 按钮在 QQ 里只有有权限的人能点：主人级只给主人；群管级给主人加本群群主和管理员，
+ *     拿不到群管名单时只给主人（群主、管理员可以引用申请回复），绝不放给所有人
+ * 主人按云崽的规则判定：other.yaml 的 master 里当前机器人名下的账号（e.isMaster），masterQQ 不算。
+ * 执行的内容在申请时就已经确定，确认时不能被换成别的。申请存在内存里，重启后失效。
+ * 确认命令由 apps/extraTools.js 处理。以 _ 开头，不会被当成工具登记。
  */
 import crypto from 'node:crypto'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const TTL = 5 * 60 * 1000
-const pending = (globalThis[Symbol.for('chatgpt-extra-tools-approval')] ??= new Map())
+const grp = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_group.js')).href)
+
+const state = (globalThis[Symbol.for('chatgpt-extra-tools-approval')] ??= { pending: new Map(), done: new Map() })
+// 热重载前的旧版本这里是一个 Map
+if (state instanceof Map) globalThis[Symbol.for('chatgpt-extra-tools-approval')] = { pending: new Map(), done: new Map() }
+const { pending, done } = globalThis[Symbol.for('chatgpt-extra-tools-approval')]
+/** 已处理的申请记多少条（用来提示“已经处理过了”） */
+const MAX_DONE = 300
 
 let cfg
+/** 当前机器人的主人（other.yaml 的 master 里 机器人账号:主人账号，和云崽的 e.isMaster 一致） */
 async function masters (e) {
   cfg ??= (await import(pathToFileURL(path.resolve('./lib/config/config.js')).href)).default
-  const list = [...(cfg.master?.[e?.self_id] || []), ...(cfg.masterQQ || [])]
-  return [...new Set(list.map(String))].filter(id => id && id !== 'stdin')
+  return [...new Set((cfg.master?.[e?.self_id] || []).map(String))].filter(id => id && id !== 'stdin')
 }
 
-/** 主人列表（other.yaml 里当前机器人的 master 和 masterQQ，第一个为主要的主人） */
+/** 主人列表（第一个为主要的主人，申请时 @ 他） */
 export const masterList = e => masters(e)
 
-/** 是否为主人（工具里判断操作对象是不是主人时用） */
+/** 某个账号是不是主人（工具里判断操作对象是不是主人时用） */
 export async function isMaster (e, userId) {
   return (await masters(e)).includes(String(userId))
 }
+
+const isGroupAdmin = role => role === 'owner' || role === 'admin'
+
+/** 发消息的人在群里能不能做群管级操作：主人，或本群的群主、管理员 */
+export async function isManager (e) {
+  if (e?.isMaster) return true
+  if (!e?.isGroup && !e?.group_id) return false
+  return isGroupAdmin(await grp.requesterRole(e))
+}
+
+/** 有没有权限直接执行 */
+const allowed = (e, level) => (level === 'manager' ? isManager(e) : !!e?.isMaster)
 
 /** 申请所在的聊天：群聊按群号，私聊统一为 private（主人在任意私聊里都能确认私聊发起的申请） */
 const chatOf = e => (e?.isGroup || e?.group_id ? `group:${e.group_id}` : 'private')
@@ -43,89 +67,151 @@ const md = text => String(text ?? '').replace(/([\\`*_[\]~|])/g, '\\$1').replace
 function newId () {
   let id
   do id = crypto.randomBytes(3).toString('hex')
-  while (pending.has(id))
+  while (pending.has(id) || done.has(id))
   return id
 }
 
-function prune () {
-  for (const [id, item] of pending) if (item.expires < Date.now()) pending.delete(id)
-}
-
-/** 官方机器人的确认 / 拒绝按钮，只允许主人点 */
-function buttons (e, id, list) {
-  if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function') return []
-  const permission = list.map(asId)
-  return [globalThis.segment.button([
-    { text: '✅ 确认', callback: `#确认 ${id}`, permission },
-    { text: '❌ 拒绝', callback: `#拒绝 ${id}`, permission }
-  ])]
+/** 能点按钮的人：主人级只有主人；群管级是主人加本群群主、管理员，拿不到群管名单时只有主人 */
+async function approvers (e, level, list) {
+  if (level !== 'manager') return list
+  try {
+    const admins = (await grp.members(e.group)).filter(m => isGroupAdmin(m.role)).map(m => String(m.user_id))
+    const bots = grp.botIds(e)
+    return [...new Set([...list, ...admins.filter(id => !bots.has(id))])]
+  } catch {
+    return list
+  }
 }
 
 /**
- * 执行风险操作：主人直接执行并返回结果；其他人改为申请主人确认
+ * 官方机器人的确认 / 拒绝按钮（野生号发按钮会报错，不发）。
+ * QQBot-Plugin 的回调按钮 5 分钟后失效，指令同时写进 action.data，超时、重启后点击照样发出指令
+ */
+function buttons (e, id, permission) {
+  if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function' || !permission.length) return []
+  const button = (text, clicked, cmd) => ({ text, clicked_text: clicked, callback: cmd, permission: permission.map(asId), QQBot: { action: { data: cmd } } })
+  return [globalThis.segment.button([button('✅ 确认', '已确认', `#确认 ${id}`), button('❌ 拒绝', '已拒绝', `#拒绝 ${id}`)])]
+}
+
+/** 发送结果里的消息 ID（官方机器人是数组，野生号是一个；ICQQ 还有 seq），用来对应引用回复 */
+function sentIds (ret) {
+  const ids = []
+  for (const r of Array.isArray(ret) ? ret : [ret]) {
+    if (!r || typeof r !== 'object') continue
+    for (const v of [r.message_id, r.seq].flat()) if (v !== undefined && v !== null && v !== '') ids.push(String(v))
+  }
+  return ids
+}
+
+/** 这条消息引用的消息 ID：野生号的 reply 消息段、e.reply_id，官方机器人的 source.seq */
+function quotedIds (e) {
+  const ids = []
+  for (const seg of Array.isArray(e.message) ? e.message : []) if (seg?.type === 'reply') ids.push(seg.id ?? seg.data?.id)
+  ids.push(e.reply_id, e.source?.message_id, e.source?.seq)
+  return ids.filter(v => v !== undefined && v !== null && v !== '').map(String)
+}
+
+/**
+ * 执行风险操作：有权限的人直接执行并返回结果；其他人改为发申请
  * @param {*} e 当前消息
- * @param {{ title: string, run: () => Promise<string> }} action title 写清楚要做什么，run 返回执行结果
+ * @param {{ title: string, run: () => Promise<string>, level?: 'master' | 'manager' }} action
+ *   title 写清楚要做什么，run 返回执行结果；level 默认主人级
  * @returns {Promise<string>} 返回给 AI 的文字
  */
-export async function guard (e, { title, run }) {
-  if (e.isMaster) return await run()
+export async function guard (e, { title, run, level = 'master' }) {
+  if (level === 'manager' && !e?.isGroup && !e?.group_id) level = 'master'
+  if (await allowed(e, level)) return await run()
   const list = await masters(e)
   if (!list.length) return '没有配置主人，这个操作只能由主人执行'
-  prune()
   const id = newId()
   const requester = `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})`
-  pending.set(id, { id, title, run, requester, chat: chatOf(e), created: Date.now(), expires: Date.now() + TTL })
-  setTimeout(() => pending.delete(id), TTL).unref?.()
+  const item = { id, title, run, level, requester, chat: chatOf(e), group_id: e.group_id, created: Date.now(), msgIds: [] }
+  pending.set(id, item)
 
-  const text = `【需要主人确认】${requester} 想让我：${title}\n回复「#确认」或 Y 执行，「#拒绝」或 N 取消，5 分钟内有效`
+  const who = level === 'manager' ? '主人或本群群主 / 管理员' : '主人'
+  const head = level === 'manager' ? '【需要确认】' : '【需要主人确认】'
+  const text = `${head}${requester} 想让我：${title}\n${who}引用这条消息回复「#确认」或 Y 执行，「#拒绝」或 N 取消`
   try {
     const first = asId(list[0])
+    let ret
     if (e.isGroup || e.group_id) {
-      const btn = buttons(e, id, list)
+      const btn = buttons(e, id, await approvers(e, level, list))
       // 官方机器人发 Markdown（带按钮），野生号发普通文字
       const body = btn.length
-        ? { type: 'markdown', data: `\n**【需要主人确认】**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n点按钮，或回复「#确认」/ Y 执行、「#拒绝」/ N 取消，5 分钟内有效` }
+        ? { type: 'markdown', data: `\n**${head}**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n${who}点按钮，或引用这条消息回复「#确认」/ Y 执行、「#拒绝」/ N 取消` }
         : ` ${text}`
-      await e.reply([{ type: 'at', qq: first }, body, ...btn])
+      ret = await e.reply([{ type: 'at', qq: first }, body, ...btn])
     } else {
       const friend = globalThis.Bot?.pickFriend?.(first)
-      if (typeof friend?.sendMsg === 'function') await friend.sendMsg(text)
-      else await e.reply(text)
+      ret = typeof friend?.sendMsg === 'function' ? await friend.sendMsg(text) : await e.reply(text)
     }
+    item.msgIds = sentIds(ret)
   } catch (err) {
     pending.delete(id)
-    return `通知主人失败（${err.message}），操作没有执行`
+    return `通知${who}失败（${err.message}），操作没有执行`
   }
-  return '这个操作需要主人确认，已经通知主人，主人确认后会自动执行。告诉用户等主人确认即可，不要自己再执行一次'
+  return `这个操作需要${who}确认，已经发了申请，确认后会自动执行。告诉用户等${who}确认即可，不要自己再执行一次`
+}
+
+/** 能不能处理这条申请：主人级要主人；群管级要主人，或申请所在群的群主、管理员 */
+async function canDecide (e, item) {
+  if (e?.isMaster) return true
+  if (item.level !== 'manager') return false
+  return String(e.group_id) === String(item.group_id) && isGroupAdmin(await grp.requesterRole(e))
+}
+
+function finish (item, text) {
+  pending.delete(item.id)
+  done.set(item.id, { msgIds: item.msgIds, text })
+  while (done.size > MAX_DONE) done.delete(done.keys().next().value)
 }
 
 /**
- * 主人确认或拒绝
- * @param {*} e 主人的消息
+ * 确认或拒绝
+ * @param {*} e 回复的消息（点按钮也是一条带申请编号的消息）
  * @param {boolean} approve
- * @param {string} [id] 按钮带的申请编号；不填时处理当前聊天里最近的一条
- * @returns {Promise<string|null>} 要回复的文字；当前聊天没有待确认的申请时返回 null
+ * @param {string} [id] 按钮带的申请编号
+ * @returns {Promise<string|null>} 要回复的文字；和申请无关、或没有权限时返回 null（消息照常交给其他插件）
  */
 export async function decide (e, approve, id) {
-  prune()
   const chat = chatOf(e)
+  const quoted = quotedIds(e)
   let item
   if (id) {
-    item = pending.get(String(id).toLowerCase())
-    if (!item || item.chat !== chat) return '这条申请已经处理过或过期了'
+    id = String(id).toLowerCase()
+    item = pending.get(id)
+    if (!item) {
+      if (!(await isManager(e))) return null
+      return done.has(id) ? '这条申请已经处理过了' : '这条申请已经失效（机器人重启过），请重新发起'
+    }
+    if (item.chat !== chat) return null
+  } else if (quoted.length) {
+    item = [...pending.values()].find(i => i.msgIds.some(m => quoted.includes(m)))
+    if (!item) {
+      const old = [...done.values()].find(d => d.msgIds.some(m => quoted.includes(m)))
+      return old && (await isManager(e)) ? '这条申请已经处理过了' : null
+    }
   } else {
-    item = [...pending.values()].filter(i => i.chat === chat).sort((a, b) => b.created - a.created)[0]
-    if (!item) return null
+    const mine = []
+    for (const i of pending.values()) if (i.chat === chat && await canDecide(e, i)) mine.push(i)
+    if (!mine.length) return null
+    if (mine.length > 1) return `这里有 ${mine.length} 条待确认的申请，请引用要处理的那条回复，或点它下面的按钮`
+    item = mine[0]
   }
-  pending.delete(item.id)
-  const left = [...pending.values()].filter(i => i.chat === chat).length
-  const more = left ? `\n（还有 ${left} 条申请待确认）` : ''
-  if (!approve) return `已拒绝 ${item.requester} 的请求：${item.title}${more}`
+  // 没有权限：无效，不处理，申请照旧有效
+  if (!(await canDecide(e, item))) return null
+
+  const by = `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})`
+  if (!approve) {
+    finish(item, 'rejected')
+    return `${by} 已拒绝 ${item.requester} 的请求：${item.title}`
+  }
+  finish(item, 'approved')
   try {
-    return `已执行 ${item.requester} 的请求：${item.title}\n${await item.run()}${more}`
+    return `${by} 已确认 ${item.requester} 的请求：${item.title}\n${await item.run()}`
   } catch (err) {
-    return `执行失败：${err.message}${more}`
+    return `执行失败：${err.message}`
   }
 }
 
-export const list = () => [...pending.values()].filter(item => item.expires >= Date.now())
+export const list = () => [...pending.values()]

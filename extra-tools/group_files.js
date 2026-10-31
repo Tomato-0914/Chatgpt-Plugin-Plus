@@ -10,7 +10,7 @@ const ws = await import(pathToFileURL(path.resolve(dir, '_workspace.js')).href)
 const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).href)
 
 const ROOT = '/'
-/** 改动群文件的操作：群主、管理员、主人直接执行，其他人需要主人确认 */
+/** 改动群文件的操作：群主、管理员、主人直接执行，其他人需要他们确认 */
 const WRITE = new Set(['delete', 'rename', 'move', 'mkdir', 'rmdir', 'rename_folder'])
 const NO_PERMISSION = /permission|权限|not.*admin|NOT_GROUP_ADMIN|-2\b|-4\b|-6\b/i
 
@@ -154,7 +154,7 @@ export class GroupFilesTool extends CustomTool {
     description: '管理当前群的群文件（需要同群的野生号）：查看文件列表（list，可指定文件夹）、按名字找文件（search）、获取下载链接（url）、查看空间用量（info）、' +
       '上传文件（upload，网址或工作目录里的文件）、删除（delete）、重命名（rename）、移动到文件夹（move）、新建文件夹（mkdir）、删除文件夹（rmdir）、重命名文件夹（rename_folder）。' +
       '同名文件有多个时：用 all_matches 一起删除 / 移动（keep_newest 保留最新的一个），或用 search 结果里的 ID 填进 name 指定其中一个。' +
-      'QQ 群文件只有一层文件夹，文件夹不能移动。删除、重命名、移动、文件夹操作：主人、群主、管理员直接执行，其他人会 @ 主人申请确认。',
+      'QQ 群文件只有一层文件夹，文件夹不能移动。删除、重命名、移动、文件夹操作：主人、群主、管理员直接执行，其他人会 @ 主人申请确认（主人、群主、管理员都能确认）。',
     parameters: {
       type: 'object',
       properties: {
@@ -257,9 +257,9 @@ export class GroupFilesTool extends CustomTool {
           await gfs.upload(src.file, name, folder?.id || ROOT)
           return `已上传「${name}」到群文件${folder ? `的「${folder.name}」文件夹` : ''}`
         }
-        // 野生号是管理员时，群友能借它绕过“仅管理员可上传”的设置，这种情况普通群友上传要主人确认
-        if (!e.isMaster && !['owner', 'admin'].includes(await grp.requesterRole(e)) && await wildIsAdmin(bot, gid)) {
-          return await approval.guard(e, { title: `上传「${name}」到群文件`, run })
+        // 野生号是管理员时，群友能借它绕过“仅管理员可上传”的设置，这种情况普通群友上传要主人或群管确认
+        if (!(await approval.isManager(e)) && await wildIsAdmin(bot, gid)) {
+          return await approval.guard(e, { title: `上传「${name}」到群文件`, run, level: 'manager' })
         }
         return await run()
       }
@@ -329,8 +329,8 @@ export class GroupFilesTool extends CustomTool {
           run = async () => { await gfs.mv(f, to.id); return `已把「${f.name}」移动到${to.id === ROOT ? '根目录' : `「${to.name}」`}` }
         }
       }
-      if (e.isMaster || ['owner', 'admin'].includes(await grp.requesterRole(e))) return await run()
-      return await approval.guard(e, { title, run })
+      // 主人、群主、管理员直接执行，其他人要他们确认
+      return await approval.guard(e, { title, run, level: 'manager' })
     } catch (err) {
       return chat.errorText(err)
     }

@@ -168,8 +168,9 @@ export class ChatGPTExtraTools extends plugin {
           permission: 'master'
         },
         {
-          // 风险工具（群管、shell 等）由非主人发起时，主人用这个确认或拒绝；按钮回调会带上申请编号。
-          // 不设 permission：群友随口说 “y” 时不能回 “暂无权限”，非主人或没有待确认的申请时直接放行
+          // 风险工具由没有权限的人发起时，用这个确认或拒绝；按钮回调会带上申请编号。
+          // 不设 permission：谁能处理由 _approval.js 判定（主人级只有主人，群管级还有本群群主、管理员），
+          // 群友随口说 “y” 时不能回 “暂无权限”，没有权限或没有待确认的申请时直接放行
           reg: APPROVE_REG,
           fnc: 'approve'
         }
@@ -178,7 +179,6 @@ export class ChatGPTExtraTools extends plugin {
   }
 
   async approve (e) {
-    if (!e.isMaster) return false
     const [, word, id] = String(e.msg || '').trim().match(APPROVE_REG) || []
     if (!word) return false
     const approval = await import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
