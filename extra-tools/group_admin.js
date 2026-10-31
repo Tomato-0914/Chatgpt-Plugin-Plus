@@ -9,6 +9,10 @@ const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).h
 
 const MAX_MUTE_MINUTES = 30 * 24 * 60
 const MAX_RECALL = 10
+/** 撤回多条时每条之间隔多久、超时后等多久重试（毫秒） */
+const RECALL_GAP = 600
+const RECALL_RETRY_WAIT = 2000
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 /** 撤回时往前翻多少条群消息来定位要撤的消息 */
 const RECALL_SCAN = 200
 const NEEDS_USER = new Set(['mute', 'unmute', 'kick', 'set_card', 'set_title', 'blacklist_add', 'blacklist_remove'])
@@ -402,11 +406,22 @@ export class GroupAdminTool extends CustomTool {
           : `撤回 ${targets.length} 条消息：\n${targets.map((t, i) => `${i + 1}. ${t.desc}`).join('\n')}`
         run = async () => {
           const failed = []
-          for (const t of targets) {
+          for (const [i, t] of targets.entries()) {
+            // 协议端连续撤回容易超时（如 pmhq ws send: wait result timeout）：每条之间隔一会儿，超时的等一下再试一次
+            if (i) await sleep(RECALL_GAP)
             try {
               await call(() => recallGroup.recallMsg(t.id))
             } catch (err) {
-              failed.push(err.message)
+              if (!/timeout|超时/i.test(err.message)) {
+                failed.push(err.message)
+                continue
+              }
+              await sleep(RECALL_RETRY_WAIT)
+              try {
+                await call(() => recallGroup.recallMsg(t.id))
+              } catch (err2) {
+                failed.push(err2.message)
+              }
             }
           }
           if (failed.length === targets.length) throw new Error(failed[0])

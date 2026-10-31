@@ -13,8 +13,8 @@
  *     不引用时只有一条待处理才处理它，有多条时提示引用或点按钮，不猜
  *   - 申请一直有效，直到有权限的人处理；没有权限的人点按钮、回复 Y / N 都无效（不处理，申请照旧有效）；
  *     处理过的申请再点、再回复只会提示已经处理过，不会重复执行
- *   - 群管级的申请带按钮，用 QQ 自带的「仅管理者」（群主、管理员），绝不放给所有人；
- *     主人级的申请、以及不是本群群管的主人，引用申请回复
+ *   - 群管级的申请带按钮，用 QQ 自带的「仅管理者」（群主、管理员），绝不放给所有人；主人在这个群发过消息时，
+ *     再加一行只给主人的按钮（主人级的申请只有这一行）；否则主人引用申请回复
  *   - 本人级的按钮只给发起者：用发起者在本群的原始 openid（消息事件里的 _raw_user_id），QQ 只让他本人点
  * 主人按云崽的规则判定：other.yaml 的 master 里当前机器人名下的账号（e.isMaster），masterQQ 不算。
  * 执行的内容在申请时就已经确定，确认时不能被换成别的。申请存在内存里，重启后失效。
@@ -30,6 +30,9 @@ const state = (globalThis[Symbol.for('chatgpt-extra-tools-approval')] ??= { pend
 // 热重载前的旧版本这里是一个 Map
 if (state instanceof Map) globalThis[Symbol.for('chatgpt-extra-tools-approval')] = { pending: new Map(), done: new Map() }
 const { pending, done } = globalThis[Symbol.for('chatgpt-extra-tools-approval')]
+/** 主人在各群的原始 openid（官方机器人群里的身份），给主人单独一行按钮用：机器人账号:群号 → Set */
+const masterRaw = (globalThis[Symbol.for('chatgpt-extra-tools-approval')].masterRaw ??= new Map())
+const MASTER_RAW_KEY = key => `chatgpt:extra-tools:master-openid:${key}`
 /** 已处理的申请记多少条（用来提示“已经处理过了”） */
 const MAX_DONE = 300
 
@@ -63,6 +66,35 @@ const allowed = (e, level) => (level === 'self' ? false : level === 'manager' ? 
 /** 发起者在本群的原始 openid（官方机器人的消息事件、按钮点击事件里都有） */
 const rawIdOf = e => String(e?._raw_user_id ?? e?.sender?._raw_user_id ?? '')
 
+/**
+ * 记下主人在这个群的原始 openid：主人的 QQ 号换算成群里的 openid 不可靠（按钮名单里放换算的谁都点不了），
+ * 只有主人在这个群里发过消息，才知道他在这里的 openid。apps/extraTools.js 收到官方机器人的群消息时调用；
+ * 同时存进 Redis（30 天），重启后照样有
+ */
+export function rememberMaster (e) {
+  if (!e?.isMaster || e.bot?.adapter?.id !== 'QQBot' || !e.group_id) return
+  const raw = rawIdOf(e)
+  if (!raw || /^\d{5,12}$/.test(raw)) return
+  const key = `${e.self_id}:${e.group_id}`
+  const set = masterRaw.get(key) || new Set()
+  if (set.has(raw)) return
+  set.add(raw)
+  masterRaw.set(key, set)
+  globalThis.redis?.set?.(MASTER_RAW_KEY(key), JSON.stringify([...set]), { EX: 30 * 86400 })?.catch?.(() => {})
+}
+
+/** 主人在这个群的原始 openid（内存里没有时读 Redis） */
+async function masterRawIds (e) {
+  const key = `${e?.self_id}:${e?.group_id}`
+  if (!masterRaw.has(key)) {
+    try {
+      const saved = JSON.parse(await globalThis.redis?.get?.(MASTER_RAW_KEY(key)) || '[]')
+      if (Array.isArray(saved) && saved.length) masterRaw.set(key, new Set(saved.map(String)))
+    } catch {}
+  }
+  return [...(masterRaw.get(key) || [])]
+}
+
 /** 是不是本人级申请的发起者：账号一样，或官方机器人的原始 openid 一样 */
 const isRequester = (e, item) => String(e?.user_id) === item.requesterId || (Boolean(item.requesterRaw) && rawIdOf(e) === item.requesterRaw)
 
@@ -83,18 +115,23 @@ function newId () {
 
 /**
  * 官方机器人的确认 / 拒绝按钮（野生号发按钮会报错，不发）：
- * - 群管级用 QQ 自带的「仅管理者」权限（admin），QQ 自己判定群主、管理员
- * - 本人级只给发起者：名单里放他在本群的原始 openid（直接可用，不用换算）
- * - 主人级不发按钮：主人的 QQ 号换成群里的 openid 实测无效，谁都点不了；也不能用「仅管理者」，否则管理员也能批准。主人引用申请回复
+ * - 群管级第一行用 QQ 自带的「仅管理者」权限（admin），QQ 自己判定群主、管理员
+ * - 主人：名单里放主人在本群的原始 openid（主人在这个群发过消息才知道，见 rememberMaster），
+ *   群管级加一行「（主人）」，主人级就只有这一行；不知道时不发，主人引用申请回复
+ * - 本人级只给发起者：名单里放他在本群的原始 openid
+ * 名单里不放换算出来的 openid：QQ 号换算成群里的 openid 实测无效，谁都点不了。
  * QQBot-Plugin 的回调按钮 5 分钟后失效，指令同时写进 action.data，超时、重启后点击照样发出指令。
  * 点过的按钮在 QQ 里只显示自己点过，点了「确认」再点「拒绝」不能显示成已确认，所以点后都显示「已处理」，结果看回复
  */
-function buttons (e, id, level, rawId) {
+function buttons (e, id, level, { rawId, masters = [] } = {}) {
   if (e.bot?.adapter?.id !== 'QQBot' || typeof globalThis.segment?.button !== 'function') return []
-  const permission = level === 'manager' ? 'admin' : level === 'self' && rawId ? [rawId] : null
-  if (!permission) return []
-  const button = (text, cmd) => ({ text, clicked_text: '已处理', callback: cmd, permission, QQBot: { action: { data: cmd } } })
-  return [globalThis.segment.button([button('✅ 确认', `#确认 ${id}`), button('❌ 拒绝', `#拒绝 ${id}`)])]
+  const rows = []
+  if (level === 'manager') rows.push({ permission: 'admin', tag: '' })
+  if ((level === 'manager' || level === 'master') && masters.length) rows.push({ permission: masters, tag: level === 'manager' ? '（主人）' : '' })
+  if (level === 'self' && rawId) rows.push({ permission: [rawId], tag: '' })
+  if (!rows.length) return []
+  const button = (text, cmd, permission) => ({ text, clicked_text: '已处理', callback: cmd, permission, QQBot: { action: { data: cmd } } })
+  return [globalThis.segment.button(...rows.map(r => [button(`✅ 确认${r.tag}`, `#确认 ${id}`, r.permission), button(`❌ 拒绝${r.tag}`, `#拒绝 ${id}`, r.permission)]))]
 }
 
 /** 发送结果里的消息 ID（官方机器人是数组，野生号是一个；ICQQ 还有 seq），用来对应引用回复 */
@@ -140,8 +177,8 @@ export async function guard (e, { title, run, level = 'master' }) {
     const first = asId(list[0])
     let ret
     if (e.isGroup || e.group_id) {
-      const btn = buttons(e, id, level)
-      // 官方机器人发 Markdown（群管级带按钮），野生号发普通文字
+      const btn = buttons(e, id, level, { masters: await masterRawIds(e) })
+      // 官方机器人发 Markdown（带按钮），野生号发普通文字
       const how = btn.length ? `${who}点按钮，或引用这条消息回复` : `${who}引用这条消息回复`
       const body = e.bot?.adapter?.id === 'QQBot'
         ? { type: 'markdown', data: `\n**${head}**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n${how}「#确认」/ Y 执行、「#拒绝」/ N 取消` }
@@ -168,7 +205,7 @@ async function askSelf (e, title, run) {
   const item = { id, title, run, level: 'self', requester, requesterId: String(e.user_id), requesterRaw: rawId, chat: chatOf(e), group_id: e.group_id, created: Date.now(), msgIds: [] }
   pending.set(id, item)
   const official = e.bot?.adapter?.id === 'QQBot'
-  const btn = buttons(e, id, 'self', rawId)
+  const btn = buttons(e, id, 'self', { rawId })
   const how = `${btn.length ? '点按钮，或' : ''}引用这条消息回复「#确认」/ Y 执行、「#拒绝」/ N 取消。只有你本人能确认，其他人（包括主人）都不能代为处理`
   try {
     // 官方机器人 @ 用原始 openid（QQ 号换算出来的不一定对）
@@ -188,9 +225,11 @@ async function askSelf (e, title, run) {
 async function canDecide (e, item) {
   if (item.level === 'self') return item.chat === chatOf(e) && isRequester(e, item)
   // 群管级申请的按钮点击：QQ 已经按「仅管理者」放行；点击事件里没有群身份，
-  // 没绑定 QQ 号的管理员也查不到身份，这里直接认可。手打的同样指令是普通消息，不算；主人级的申请没有按钮
+  // 没绑定 QQ 号的管理员也查不到身份，这里直接认可。手打的同样指令是普通消息，不算
   if (item.level === 'manager' && isButtonClick(e) && String(e.group_id) === String(item.group_id)) return true
   if (e?.isMaster) return true
+  // 主人那一行按钮的点击：核对点击者的原始 openid 是记下的主人
+  if (isButtonClick(e) && (await masterRawIds(e)).includes(rawIdOf(e))) return true
   if (item.level !== 'manager') return false
   return String(e.group_id) === String(item.group_id) && isGroupAdmin(await grp.requesterRole(e))
 }
@@ -240,8 +279,9 @@ export async function decide (e, approve, id) {
   // 没有权限：无效，不处理，申请照旧有效
   if (!(await canDecide(e, item))) return null
 
-  // 没绑定 QQ 号的管理员点按钮时只有 openid
-  const by = item.level === 'self' ? item.requester : /^\d{5,12}$/.test(String(e.user_id)) ? `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})` : (e.sender?.card || e.sender?.nickname || '管理员')
+  // 没绑定 QQ 号的人点按钮时只有 openid：是记下的主人就写主人，否则写管理员
+  const fallback = (await masterRawIds(e)).includes(rawIdOf(e)) ? '主人' : '管理员'
+  const by = item.level === 'self' ? item.requester : /^\d{5,12}$/.test(String(e.user_id)) ? `${e.sender?.card || e.sender?.nickname || ''}(${e.user_id})` : (e.sender?.card || e.sender?.nickname || fallback)
   const whose = item.level === 'self' ? '' : ` ${item.requester} 的请求`
   if (!approve) {
     finish(item, 'rejected')
