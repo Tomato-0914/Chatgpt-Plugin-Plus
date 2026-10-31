@@ -116,6 +116,25 @@ export async function groupInfo (e, gid, current) {
   return info
 }
 
+/**
+ * 机器人（一般是同群野生号）在群里的身份：owner / admin / member，拿不到时返回空串（交给接口自己报错）
+ * ICQQ 的群对象有 is_owner / is_admin；其他的查机器人自己的成员信息，再不行翻成员列表
+ */
+export async function botRole (bot, gid) {
+  const group = bot?.pickGroup?.(chat.asId(gid))
+  if (group?.is_owner === true) return 'owner'
+  if (group?.is_admin === true) return 'admin'
+  try {
+    const role = (await group?.pickMember?.(chat.asId(bot.uin))?.getInfo?.())?.role
+    if (role) return role
+  } catch {}
+  try {
+    return (await members(group)).find(m => String(m.user_id) === String(bot.uin))?.role || ''
+  } catch {
+    return ''
+  }
+}
+
 /** 发起请求的人在群里的身份（owner / admin / member）；查不到时为空串 */
 export async function requesterRole (e) {
   if (e?.sender?.role) return e.sender.role

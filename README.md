@@ -457,7 +457,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 273 | `set_group_card` | `group_admin`（set_card） | 设置群成员名片，支持单个或批量设置 | 危险 | ✅ |
 | 274 | `set_group_whole_ban` | `group_admin`（mute_all） | 设置全群禁言（需要管理员权限） | 危险 | ✅ |
 | 275 | `set_group_admin` |  | 设置/取消群管理员，支持单个或批量设置（需要群主权限） | 危险 |  |
-| 276 | `set_group_name` |  | 修改群名称（需要管理员权限） | 危险 |  |
+| 276 | `set_group_name` | `group_admin`（set_group_name） | 修改群名称（需要管理员权限） | 危险 | 🆕 |
 | 277 | `set_group_special_title` | `group_admin`（set_title） | 设置群成员专属头衔，支持单个或批量设置（需要群主权限） | 危险 | ✅ |
 | 278 | `send_group_notice` |  | 发送群公告（需要管理员权限） | 危险 |  |
 | 279 | `delete_group_notice` |  | 删除群公告（需要管理员权限） | 危险 |  |

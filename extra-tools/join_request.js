@@ -14,6 +14,7 @@ function explain (err) {
   const message = String(err?.message ?? err)
   const code = Number(err?.code ?? err?.err_code ?? message.match(/code\((\d+)\)/)?.[1])
   if (code === ALREADY_HANDLED) return '这条申请已经被处理过了'
+  if (code === 11253 || /11253/.test(message)) return '官方机器人没有开通这个接口（需要向 QQ 开放平台申请内邀权限）'
   if (/NOT_GROUP_ADMIN|not.*admin|权限|permission/i.test(message)) return `机器人不是群管理员（${message}）`
   return message.match(/code\(\d+\):\s*(.+)$/s)?.[1]?.trim() || message
 }

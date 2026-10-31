@@ -12,45 +12,62 @@ const preview = text => (text.length > 40 ? `${text.slice(0, 40)}…` : text) ||
 const ERRORS = [[/NOT_GROUP_ADMIN|not.*admin|权限|permission/i, '野生号不是群管理员，设置 / 取消精华需要管理员']]
 const explain = text => ERRORS.find(([re]) => re.test(text))?.[1] || text
 
-/** 精华消息内容：OneBot 为消息段数组，网页接口为 msg_content */
+/** 精华消息内容：OneBot 为消息段数组，网页接口为 msg_content；不同协议端的写法不一样，尽量都认 */
 function contentText (list) {
+  if (typeof list === 'string') return list.replace(/\s+/g, ' ').trim()
   return (Array.isArray(list) ? list : []).map(seg => {
-    const data = seg?.data && typeof seg.data === 'object' ? seg.data : seg
-    if (seg?.type === 'text' || seg?.msg_type === 1) return data.text ?? ''
-    if (seg?.type === 'image' || seg?.msg_type === 3) return '[图片]'
-    if (seg?.type === 'face' || seg?.msg_type === 2) return '[表情]'
-    if (seg?.type === 'at') return `@${data.qq ?? ''}`
-    return seg?.type ? `[${seg.type}]` : ''
+    if (typeof seg === 'string') return seg
+    const data = seg?.data && typeof seg.data === 'object' ? seg.data : seg || {}
+    const type = seg?.type ?? seg?.msg_type
+    if (type === 'text' || type === 1) return data.text ?? ''
+    if (type === 'image' || type === 3 || data.image_url || data.file_id) return '[图片]'
+    if (type === 'face' || type === 'mface' || type === 2) return '[表情]'
+    if (type === 'at') return `@${data.qq ?? data.name ?? ''}`
+    if (data.text) return data.text
+    return type !== undefined ? `[${type}]` : ''
   }).join('').replace(/\s+/g, ' ').trim()
 }
 
-/** 精华消息列表：OneBot 的 get_essence_msg_list，ICQQ 用网页接口 */
+const pick = (o, ...keys) => keys.map(k => o?.[k]).find(v => v !== undefined && v !== null && v !== '')
+
+/** 一条精华统一成 { id, seq, random, senderId, sender, senderTime, operator, time, text, keys } */
+function normalize (m) {
+  const senderId = String(pick(m, 'sender_id', 'sender_uin', 'user_id') ?? '')
+  const nick = pick(m, 'sender_nick', 'sender_name', 'nickname') || ''
+  return {
+    id: pick(m, 'message_id', 'msg_id'),
+    seq: pick(m, 'msg_seq', 'message_seq', 'seq'),
+    random: pick(m, 'msg_random', 'random'),
+    senderId,
+    sender: nick || senderId ? `${nick}${senderId ? `(${senderId})` : ''}` : '',
+    senderTime: Number(pick(m, 'sender_time', 'send_time')) || 0,
+    operator: pick(m, 'operator_nick', 'add_digest_nick', 'operator_name') || pick(m, 'operator_id', 'add_digest_uin'),
+    time: Number(pick(m, 'operator_time', 'add_digest_time', 'sender_time')) || 0,
+    text: contentText(pick(m, 'content', 'msg_content', 'message')),
+    keys: Object.keys(m || {})
+  }
+}
+
+/** 精华消息列表（每次现查）：OneBot 的 get_essence_msg_list，ICQQ 用网页接口 */
 async function essenceList (bot, gid) {
   if (typeof bot.sendApi === 'function') {
     const ret = await chat.invoke([[bot, 'sendApi', ['get_essence_msg_list', { group_id: Number(gid) }]]], '查看精华消息')
-    return (Array.isArray(ret) ? ret : []).map(m => ({
-      id: m.message_id,
-      seq: m.msg_seq ?? m.message_seq,
-      random: m.msg_random,
-      senderTime: Number(m.sender_time) || 0,
-      senderId: String(m.sender_id ?? ''),
-      sender: `${m.sender_nick || ''}(${m.sender_id})`,
-      operator: m.operator_nick || m.operator_id,
-      time: m.operator_time || m.sender_time,
-      text: contentText(m.content)
-    }))
+    const raw = Array.isArray(ret) ? ret : Array.isArray(ret?.list) ? ret.list : []
+    return raw.map(normalize)
   }
   const cred = await web.credentials(bot, 'qun.qq.com')
   const list = []
   for (let page = 0; page < 5; page++) {
     const ret = await web.call(`https://qun.qq.com/cgi-bin/group_digest/digest_list?bkn=${cred.bkn}&group_code=${gid}&page_start=${page}&page_limit=20`, cred)
-    for (const m of ret.data?.msg_list || []) {
-      list.push({ senderId: String(m.sender_uin ?? ''), sender: `${m.sender_nick || ''}(${m.sender_uin})`, operator: m.add_digest_nick || m.add_digest_uin, time: m.add_digest_time || m.sender_time, text: contentText(m.msg_content) })
-    }
+    for (const m of ret.data?.msg_list || []) list.push(normalize(m))
     if (ret.data?.is_end !== false) break
   }
   return list
 }
+
+/** 能用来取消的精华：有消息 ID，或者有消息序号和随机数（走网页接口） */
+const removable = i => (i.id !== undefined && i.id !== null) || (i.seq !== undefined && i.seq !== null && i.random !== undefined && i.random !== null)
+const sameItem = (a, b) => (a.id !== undefined && a.id !== null && String(a.id) === String(b.id)) || (a.seq !== undefined && a.seq !== null && String(a.seq) === String(b.seq))
 
 /**
  * 设置 / 取消精华的那条消息：引用了消息时一律是被引用的那条（不管有没有填 user_id / keyword），
@@ -68,16 +85,16 @@ async function target (e, bot, gid, args) {
 }
 
 /**
- * 取消精华的那条：一律落到精华列表里的一条，用列表给的消息 ID 删（列表每次现查，不缓存）。
+ * 取消精华的那条：一律落到精华列表里的一条，用列表给的消息 ID（没有时用消息序号）取消（列表每次现查，不缓存）。
  * 没有引用：按序号（list 的显示顺序，1 是最近设置的）/ 发送人 / 关键词在列表里找；
  * 引用了消息：先在群消息记录里找到被引用的那条，再到列表里对——消息 ID → 消息序号 → 同一个人、发送时间最接近的。
  * 只按“[图片]”这类内容去群消息记录里找，同一个人发过几张图时会对错，所以不能直接拿记录里的那条去删。
- * 只有 OneBot 的列表带消息 ID；ICQQ 返回 null，交给群消息记录找
  */
 async function removeTarget (e, bot, gid, args) {
-  if (typeof bot.sendApi !== 'function') return null
-  const list = (await essenceList(bot, gid)).filter(m => m.id !== undefined && m.id !== null).reverse()
-  if (!list.length) throw new Error('这个群没有精华消息（或精华列表里没有消息 ID）')
+  const all = (await essenceList(bot, gid)).reverse()
+  if (!all.length) throw new Error('这个群没有精华消息')
+  const list = all.filter(removable)
+  if (!list.length) throw new Error(`精华列表里既没有消息 ID 也没有消息序号，取消不了（接口返回的字段：${all[0].keys.join('、')}）`)
 
   if (!e.source) {
     const index = Math.floor(Number(args.index))
@@ -97,7 +114,7 @@ async function removeTarget (e, bot, gid, args) {
   const m = await chat.quotedMessage(e, bot, gid).catch(() => null)
   const byId = m && list.find(i => String(i.id) === String(m.message_id))
   if (byId) return byId
-  const seqs = [m?.real_seq, m?.message_seq, m?.seq].filter(v => v !== undefined && v !== null).map(String)
+  const seqs = [m?.real_seq, m?.message_seq, m?.seq, m?.msg_seq].filter(v => v !== undefined && v !== null).map(String)
   const bySeq = seqs.length && list.find(i => i.seq !== undefined && i.seq !== null && seqs.includes(String(i.seq)))
   if (bySeq) return bySeq
   const quotedSender = /^\d{5,12}$/.test(String(e.source.user_id ?? '')) ? String(e.source.user_id) : ''
@@ -115,9 +132,35 @@ async function webCancel (bot, gid, item) {
   await web.call(`https://qun.qq.com/cgi-bin/group_digest/cancel_digest?bkn=${cred.bkn}&group_code=${gid}&msg_seq=${item.seq}&msg_random=${item.random}`, cred)
 }
 
-/** 取消后还在不在精华列表里（接口报“已被移除”时用来确认） */
-async function stillEssence (bot, gid, id) {
-  return (await essenceList(bot, gid).catch(() => [])).some(i => String(i.id) === String(id))
+/** 取消后还在不在精华列表里（按消息 ID 或序号对）；查不了列表时当作还在 */
+async function stillEssence (bot, gid, item) {
+  const list = await essenceList(bot, gid).catch(() => null)
+  return !list || list.some(i => sameItem(i, item))
+}
+
+/**
+ * 取消一条精华：有消息 ID 先用协议端的接口，失败或没有 ID 时用 QQ 网页版按序号取消；
+ * 接口报错时再查一次列表，确实不在了就算已经取消。返回 true 为取消了，'gone' 为本来就不是精华了
+ */
+async function removeEssence (bot, gid, item) {
+  let first
+  if (item.id !== undefined && item.id !== null) {
+    try {
+      await chat.invoke([[bot, 'removeEssenceMessage', [item.id]], [bot, 'sendApi', ['delete_essence_msg', { message_id: item.id }]]], '取消精华')
+      return true
+    } catch (err) {
+      first = err
+      if (!(await stillEssence(bot, gid, item))) return 'gone'
+    }
+  }
+  if (item.seq === undefined || item.seq === null || item.random === undefined || item.random === null) throw new Error(explain(first.message))
+  try {
+    await webCancel(bot, gid, item)
+  } catch (err) {
+    throw new Error(first ? `${explain(first.message)}；网页接口也失败：${err.message}` : err.message)
+  }
+  if (await stillEssence(bot, gid, item)) throw new Error(`${first ? `${explain(first.message)}；` : ''}网页接口返回成功，但精华列表里还有这条`)
+  return true
 }
 
 export class EssenceTool extends CustomTool {
@@ -170,31 +213,24 @@ export class EssenceTool extends CustomTool {
         const set = args.action === 'set'
         // 取消精华：落到精华列表里的一条（ICQQ 没有带 ID 的列表，按群消息记录找）
         const hit = set ? null : await removeTarget(e, bot, gid, args)
-        const m = hit ? { message_id: hit.id } : await target(e, bot, gid, args)
+        const m = hit ? null : await target(e, bot, gid, args)
         const desc = hit
-          ? `${hit.sender}：${preview(hit.text)}`
+          ? `${hit.sender || '未知'}：${preview(hit.text)}`
           : `${m.sender?.card || m.sender?.nickname || ''}(${chat.senderOf(m)})：${preview(chat.textOf(m))}`
         return await approval.guard(e, {
           level: 'manager',
           title: `${set ? '把这条消息设为精华' : '取消这条消息的精华'}：${desc}`,
           run: async () => {
+            if (hit) {
+              return (await removeEssence(bot, gid, hit)) === 'gone' ? `这条消息已经不是精华了：${desc}` : `已取消精华：${desc}`
+            }
             try {
               await chat.invoke(set
                 ? [[bot, 'setEssenceMessage', [m.message_id]], [bot, 'sendApi', ['set_essence_msg', { message_id: m.message_id }]]]
                 : [[bot, 'removeEssenceMessage', [m.message_id]], [bot, 'sendApi', ['delete_essence_msg', { message_id: m.message_id }]]],
               set ? '设置精华' : '取消精华')
             } catch (err) {
-              if (set || !hit) throw new Error(explain(err.message))
-              // 取消失败：再查一次列表，确实不在了就当已经取消（接口有时报“已被移除精华”）
-              if (!(await stillEssence(bot, gid, hit.id))) return `这条消息已经不是精华了：${desc}`
-              // 还在：协议端按消息 ID 取消不一定成功，改用 QQ 网页版按消息序号取消
-              if (hit.seq === undefined || hit.seq === null || hit.random === undefined || hit.random === null) throw new Error(explain(err.message))
-              try {
-                await webCancel(bot, gid, hit)
-              } catch (err2) {
-                throw new Error(`${explain(err.message)}；网页接口也失败：${err2.message}`)
-              }
-              if (await stillEssence(bot, gid, hit.id)) throw new Error(`${explain(err.message)}；网页接口返回成功，但精华列表里还有这条`)
+              throw new Error(explain(err.message))
             }
             return `已${set ? '设为精华' : '取消精华'}：${desc}`
           }
@@ -202,11 +238,15 @@ export class EssenceTool extends CustomTool {
       }
 
       const limit = Math.min(Math.max(Math.floor(Number(args.limit)) || 10, 1), 50)
-      const list = await essenceList(bot, gid)
+      const list = (await essenceList(bot, gid)).reverse()
       if (!list.length) return '这个群还没有精华消息'
-      const lines = list.slice(-limit).reverse().map((m, i) =>
-        `${i + 1}. ${m.sender}：${preview(m.text)}${m.operator ? `（${m.operator} 设置${m.time ? `，${grp.time(m.time)}` : ''}）` : ''}`)
-      return `共 ${list.length} 条精华消息${list.length > limit ? `，显示最近 ${limit} 条` : ''}：\n${lines.join('\n')}`
+      const lines = list.slice(0, limit).map((m, i) => {
+        const extra = [m.operator && `${m.operator} 设置`, m.time && grp.time(m.time)].filter(Boolean).join('，')
+        return `${i + 1}. ${m.sender || '未知'}：${preview(m.text)}${extra ? `（${extra}）` : ''}`
+      })
+      // 发送人、内容都没解析出来：多半是协议端的字段名不一样，把字段名带上方便排查
+      const unknown = list.every(m => !m.sender && !m.text) ? `\n（没有解析出发送人和内容，接口返回的字段：${list[0].keys.join('、')}）` : ''
+      return `共 ${list.length} 条精华消息${list.length > limit ? `，显示最近 ${limit} 条` : ''}（序号可以用于取消，1 是最近设置的）：\n${lines.join('\n')}${unknown}`
     } catch (err) {
       return chat.errorText(err)
     }
