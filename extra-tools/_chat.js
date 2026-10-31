@@ -147,19 +147,36 @@ export const senderOf = m => String(m.user_id ?? m.sender?.user_id ?? '')
  * 官方机器人收到的消息只有发送时间和内容，消息 ID 野生号用不了：到野生号的消息记录里按时间、内容找同一条。
  * filter 用来限定消息类型（如合并转发）；限定了类型时，按内容找不到就取时间最接近的那条
  */
-function sameMessage (history, time, text, filter) {
+function sameMessage (history, time, text, filter, sender) {
   const near = history
     .filter(m => Math.abs(Number(m.time) - time) <= 120)
     .filter(m => !filter || filter(m))
+    .filter(m => !sender || senderOf(m) === sender)
     .sort((a, b) => Math.abs(Number(a.time) - time) - Math.abs(Number(b.time) - time))
   const t = norm(text).slice(0, 20)
   const byText = near.find(m => !t || norm(textOf(m)).includes(t) || t.includes(norm(textOf(m)).slice(0, 20)))
   return byText || (filter ? near[0] : undefined)
 }
 
+/** 机器人自己发的消息（请求之后机器人马上发的提示、思考过程等不能算进来） */
+const isBotMsg = m => (globalThis.Bot?.uin || []).map(String).includes(senderOf(m))
+
+/**
+ * 是不是发起请求的这条消息本身（野生号这边的记录）：同一个人、时间相差 10 秒内、内容包含这条消息的文字。
+ * 官方机器人和野生号记录的时间可能差一两秒，不能只按时间排除
+ */
+function isCurrent (e, m) {
+  if (isWildBot(e.bot) && e.message_id && m.message_id === e.message_id) return true
+  const cur = norm(e.msg ?? e.raw_message).slice(0, 20)
+  if (!cur || senderOf(m) !== String(e.user_id)) return false
+  return Math.abs(Number(m.time) - (Number(e.time) || Date.now() / 1000)) <= 10 && norm(textOf(m)).includes(cur)
+}
+
 /**
  * 被引用的那条消息（野生号这边的消息对象）；没有引用时返回 null
- * 当前机器人是野生号时直接取引用，官方机器人收到的引用到野生号的消息记录里找
+ * 当前机器人是野生号时直接取引用，官方机器人收到的引用到野生号的消息记录里找。
+ * 官方机器人没收到被引用的消息时（没有 @ 机器人的消息收不到），引用信息里的时间是这条请求的时间，
+ * 所以只在这条请求之前的消息里找，并排除请求本身
  */
 export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) {
   if (!e.source) return null
@@ -167,7 +184,13 @@ export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) 
     const reply = await e.getReply?.().catch(() => null)
     if (reply?.message_id && (!filter || filter(reply))) return reply
   }
-  const found = sameMessage(await fetchHistory(bot, gid, scan), Number(e.source.time), e.source.message, filter)
+  const now = Number(e.time) || Infinity
+  const history = (await fetchHistory(bot, gid, scan))
+    .filter(m => Number(m.time) < now || (Number(m.time) <= now + 2 && !isBotMsg(m)))
+    .filter(m => !isCurrent(e, m))
+  const time = Number(e.source.time) || now
+  const sender = /^\d{5,12}$/.test(String(e.source.user_id ?? '')) ? String(e.source.user_id) : ''
+  const found = (sender && sameMessage(history, time, e.source.message, filter, sender)) || sameMessage(history, time, e.source.message, filter)
   if (!found) throw new Error('没有在群消息记录里找到被引用的那条消息，可能太早了')
   return found
 }
@@ -181,14 +204,16 @@ export async function currentMessage (e, bot, gid) {
 }
 
 /**
- * 最近的几条消息（不含当前这条请求以及之后的消息），从早到晚
+ * 最近的几条消息（不含当前这条请求以及之后的消息），从早到晚。
+ * 两个机器人记录的时间可能差一两秒，按时间放宽 2 秒，再用 isCurrent 排除请求本身
  * @param {{ users?: string[], keyword?: string, count?: number, filter?: Function, scan?: number }} options
  */
 export async function recentMessages (e, bot, gid, { users, keyword, count = 1, filter, scan = SCAN } = {}) {
   const before = Number(e.time) || Infinity
   const kw = String(keyword ?? '').toLowerCase()
   return (await fetchHistory(bot, gid, scan))
-    .filter(m => Number(m.time) < before)
+    .filter(m => Number(m.time) < before || (Number(m.time) <= before + 2 && !isBotMsg(m)))
+    .filter(m => !isCurrent(e, m))
     .filter(m => !users || users.includes(senderOf(m)))
     .filter(m => !kw || textOf(m).toLowerCase().includes(kw))
     .filter(m => !filter || filter(m))

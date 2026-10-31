@@ -30,6 +30,7 @@ async function essenceList (bot, gid) {
     const ret = await chat.invoke([[bot, 'sendApi', ['get_essence_msg_list', { group_id: Number(gid) }]]], '查看精华消息')
     return (Array.isArray(ret) ? ret : []).map(m => ({
       id: m.message_id,
+      senderId: String(m.sender_id ?? ''),
       sender: `${m.sender_nick || ''}(${m.sender_id})`,
       operator: m.operator_nick || m.operator_id,
       time: m.operator_time || m.sender_time,
@@ -41,23 +42,45 @@ async function essenceList (bot, gid) {
   for (let page = 0; page < 5; page++) {
     const ret = await web.call(`https://qun.qq.com/cgi-bin/group_digest/digest_list?bkn=${cred.bkn}&group_code=${gid}&page_start=${page}&page_limit=20`, cred)
     for (const m of ret.data?.msg_list || []) {
-      list.push({ sender: `${m.sender_nick || ''}(${m.sender_uin})`, operator: m.add_digest_nick || m.add_digest_uin, time: m.add_digest_time || m.sender_time, text: contentText(m.msg_content) })
+      list.push({ senderId: String(m.sender_uin ?? ''), sender: `${m.sender_nick || ''}(${m.sender_uin})`, operator: m.add_digest_nick || m.add_digest_uin, time: m.add_digest_time || m.sender_time, text: contentText(m.msg_content) })
     }
     if (ret.data?.is_end !== false) break
   }
   return list
 }
 
-/** 设置 / 取消精华的那条消息：引用的消息，或按发送人 / 关键词找最近一条 */
+/**
+ * 设置 / 取消精华的那条消息：引用了消息时一律是被引用的那条（不管有没有填 user_id / keyword），
+ * 否则按发送人 / 关键词找最近一条
+ */
 async function target (e, bot, gid, args) {
   const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
   const keyword = String(args.keyword ?? '').trim()
-  if (e.source && !userId && !keyword) return await chat.quotedMessage(e, bot, gid)
+  if (e.source) return await chat.quotedMessage(e, bot, gid)
   if (!userId && !keyword) throw new Error('请引用那条消息，或提供 user_id（谁发的）/ keyword（内容关键词）')
   const uid = userId ? await chat.realQQ(e, userId) : ''
   const [m] = await chat.recentMessages(e, bot, gid, { users: uid ? [uid] : null, keyword })
   if (!m) throw new Error(`最近 ${chat.SCAN} 条群消息里没有找到符合条件的消息`)
   return m
+}
+
+/**
+ * 精华列表里要取消的那条（列表按 list 的显示顺序，1 是最近设置的）；
+ * 只有 OneBot 的列表带消息 ID，ICQQ 返回 null 交给群消息记录找
+ */
+async function fromList (bot, gid, args) {
+  const index = Math.floor(Number(args.index))
+  const userId = String(args.user_id ?? '').replace(/^@/, '').trim()
+  const keyword = String(args.keyword ?? '').trim().toLowerCase()
+  if (!index && !userId && !keyword) return null
+  const list = (await essenceList(bot, gid)).filter(m => m.id !== undefined && m.id !== null).reverse()
+  if (!list.length) return null
+  if (index) {
+    if (!list[index - 1]) throw new Error(`精华列表只有 ${list.length} 条，没有第 ${index} 条`)
+    return { ...list[index - 1], message_id: list[index - 1].id }
+  }
+  const m = list.find(i => (!userId || i.senderId === userId) && (!keyword || i.text.toLowerCase().includes(keyword)))
+  return m ? { ...m, message_id: m.id } : null
 }
 
 export class EssenceTool extends CustomTool {
@@ -66,7 +89,8 @@ export class EssenceTool extends CustomTool {
   function = {
     name: 'essence',
     description: '群精华消息（需要同群的野生号）：查看精华消息列表（list）、把一条消息设为精华（set）、取消精华（remove）。' +
-      '设置 / 取消时引用那条消息（工具会自己读取引用，看不到引用内容也直接调用），或用 user_id / keyword 找最近一条；需要野生号是管理员。' +
+      '设置 / 取消时：用户引用了消息就是被引用的那条，直接调用、不要填 user_id / keyword（工具会自己读取引用，看不到引用内容也直接调用，图片也一样）；' +
+      '没有引用时用 user_id / keyword 找最近一条；取消精华还可以用 index（list 里的序号，1 是最近设置的）。需要野生号是管理员。' +
       '主人、群主、管理员要求时直接执行；其他人要求设置 / 取消时会 @ 主人申请确认（主人、群主、管理员都能确认，告诉用户等确认即可）。',
     parameters: {
       type: 'object',
@@ -83,6 +107,10 @@ export class EssenceTool extends CustomTool {
         keyword: {
           type: 'string',
           description: 'set / remove 时按内容关键词找最近一条消息（没有引用时用）'
+        },
+        index: {
+          type: 'number',
+          description: 'remove 时按精华列表的序号取消（list 显示的序号，1 是最近设置的）'
         },
         limit: {
           type: 'number',
@@ -103,8 +131,12 @@ export class EssenceTool extends CustomTool {
 
       if (args.action === 'set' || args.action === 'remove') {
         const set = args.action === 'set'
-        const m = await target(e, bot, gid, args)
-        const desc = `${m.sender?.card || m.sender?.nickname || ''}(${chat.senderOf(m)})：${preview(chat.textOf(m))}`
+        // 取消精华且没有引用：从精华列表里找（序号 / 发送人 / 关键词），找不到再按群消息记录找
+        const hit = !set && !e.source ? await fromList(bot, gid, args) : null
+        const m = hit || await target(e, bot, gid, args)
+        const desc = hit
+          ? `${hit.sender}：${preview(hit.text)}`
+          : `${m.sender?.card || m.sender?.nickname || ''}(${chat.senderOf(m)})：${preview(chat.textOf(m))}`
         return await approval.guard(e, {
           level: 'manager',
           title: `${set ? '把这条消息设为精华' : '取消这条消息的精华'}：${desc}`,
