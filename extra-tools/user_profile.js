@@ -41,7 +41,7 @@ export class UserProfileTool extends CustomTool {
 
   function = {
     name: 'user_profile',
-    description: '查看某人的 QQ 资料卡：昵称、性别、年龄、地区、QQ 等级、会员、个性签名、注册时间等（需要野生号），也可以把头像发出来。' +
+    description: '查看某人的 QQ 资料卡：昵称、性别、年龄、地区、QQ 等级、会员、个性签名、注册时间等（需要其他协议机器人），也可以把头像发出来。' +
       '查群名片、群身份、入群时间用 member_info。',
     parameters: {
       type: 'object',
@@ -69,7 +69,7 @@ export class UserProfileTool extends CustomTool {
       let text
       const bot = chat.anyWild(e)
       if (!bot) {
-        text = '没有在线的野生号，查不了资料卡（官方机器人没有这个接口）'
+        text = '没有在线的其他协议机器人，查不了资料卡（官方机器人没有这个接口）'
       } else {
         try {
           text = format(uid, await profile(bot, uid) || {}) || '没有查到资料'

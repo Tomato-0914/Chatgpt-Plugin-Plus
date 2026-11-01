@@ -9,7 +9,7 @@ const web = await import(pathToFileURL(path.resolve(dir, '_qqweb.js')).href)
 const approval = await import(pathToFileURL(path.resolve(dir, '_approval.js')).href)
 
 const preview = text => (text.length > 40 ? `${text.slice(0, 40)}…` : text) || '（无文字）'
-const ERRORS = [[/NOT_GROUP_ADMIN|not.*admin|权限|permission/i, '野生号不是群管理员，设置 / 取消精华需要管理员']]
+const ERRORS = [[/NOT_GROUP_ADMIN|not.*admin|权限|permission/i, '其他协议机器人不是群管理员，设置 / 取消精华需要管理员']]
 const explain = text => ERRORS.find(([re]) => re.test(text))?.[1] || text
 
 /** 精华消息内容：OneBot 为消息段数组，网页接口为 msg_content；不同协议端的写法不一样，尽量都认 */
@@ -213,9 +213,9 @@ export class EssenceTool extends CustomTool {
 
   function = {
     name: 'essence',
-    description: '群精华消息（需要同群的野生号）：查看精华消息列表（list）、把一条消息设为精华（set）、取消精华（remove）。' +
+    description: '群精华消息（需要同群的其他协议机器人）：查看精华消息列表（list）、把一条消息设为精华（set）、取消精华（remove）。' +
       '设置 / 取消时：用户引用了消息就是被引用的那条，直接调用、不要填 user_id / keyword（工具会自己读取引用，看不到引用内容也直接调用，图片也一样）；' +
-      '没有引用时用 user_id / keyword 找最近一条；取消精华还可以用 index（list 里的序号，1 是最近设置的），取消时工具会到精华列表里核对是哪一条。需要野生号是管理员。' +
+      '没有引用时用 user_id / keyword 找最近一条；取消精华还可以用 index（list 里的序号，1 是最近设置的），取消时工具会到精华列表里核对是哪一条。需要其他协议机器人是管理员。' +
       '主人、群主、管理员要求时直接执行；其他人要求设置 / 取消时会 @ 主人申请确认（主人、群主、管理员都能确认，告诉用户等确认即可）。',
     parameters: {
       type: 'object',

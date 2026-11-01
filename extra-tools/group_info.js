@@ -25,7 +25,7 @@ async function info (e, gid, current) {
     ['管理员', list.length ? `${admins.length} 人${admins.length ? `：${admins.slice(0, 10).map(grp.nameOf).join('、')}${admins.length > 10 ? ' 等' : ''}` : ''}` : ''],
     ['建群时间', grp.time(data.create_time)],
     ['群等级', data.group_level || data.grade],
-    [wild === e.bot ? '机器人身份' : '同群野生号身份', self ? grp.ROLE[self.role] || self.role : ''],
+    [wild === e.bot ? '机器人身份' : '同群的其他协议机器人身份', self ? grp.ROLE[self.role] || self.role : ''],
     ['全员禁言', data.shutup_time_whole ? '开启' : '']
   ].filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 0)
   if (!lines.length) return '没有查到这个群的资料'

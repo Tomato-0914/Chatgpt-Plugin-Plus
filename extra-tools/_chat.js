@@ -1,7 +1,7 @@
 /**
  * 与聊天、群操作相关的工具共用的辅助函数
  *
- * 官方机器人没有的群操作（戳一戳、点赞、查群员、拉群消息记录等）由 Cheshire-Plugin 的野生号代办（原来在 QQBot-Plugin），
+ * 官方机器人没有的群操作（戳一戳、点赞、查群员、拉群消息记录等）由 Cheshire-Plugin 的其他协议机器人代办（原来在 QQBot-Plugin），
  * 这里照常调用 Yunzai 的群 / 成员 / 好友对象即可。以 _ 开头，不会被当成工具登记。
  */
 import fs from 'node:fs'
@@ -70,10 +70,10 @@ export async function realQQ (e, userId) {
 
 export const errorText = err => `操作失败：${err?.message || err}`
 
-/** 野生号（OneBotv11 / ICQQ） */
+/** 其他协议机器人（OneBotv11 / ICQQ） */
 export const isWildBot = bot => ['OneBotv11', 'ICQQ'].includes(bot?.adapter?.name)
 
-/** 在这个群里的野生号（群号必须是真实群号） */
+/** 在这个群里的其他协议机器人（群号必须是真实群号） */
 export function wildInGroup (groupId) {
   const gid = Number(groupId)
   if (!gid) return null
@@ -109,10 +109,10 @@ export function textOf (msg) {
   return String(msg.raw_message ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** 用野生号往前翻群消息记录，返回按时间从早到晚排好的消息 */
+/** 用其他协议机器人往前翻群消息记录，返回按时间从早到晚排好的消息 */
 export async function fetchHistory (bot, groupId, total) {
   const group = bot.pickGroup(Number(groupId))
-  if (typeof group?.getChatHistory !== 'function') throw new Error('野生号不支持读取群消息记录')
+  if (typeof group?.getChatHistory !== 'function') throw new Error('其他协议机器人不支持读取群消息记录')
   const seen = new Map()
   let anchor
   for (let page = 0; page < Math.ceil(total / PAGE); page++) {
@@ -136,7 +136,7 @@ export async function fetchHistory (bot, groupId, total) {
   return [...seen.values()].sort((a, b) => Number(a.time) - Number(b.time))
 }
 
-/* ---------- 在野生号这边找到同一条消息（撤回、精华、表情回应、合并转发共用） ---------- */
+/* ---------- 在其他协议机器人这边找到同一条消息（撤回、精华、表情回应、合并转发共用） ---------- */
 
 /** 默认往前翻多少条群消息 */
 export const SCAN = 200
@@ -146,7 +146,7 @@ const norm = text => String(text ?? '').replace(/\s+/g, '')
 export const senderOf = m => String(m.user_id ?? m.sender?.user_id ?? '')
 
 /**
- * 官方机器人收到的消息只有发送时间和内容，消息 ID 野生号用不了：到野生号的消息记录里按时间、内容找同一条。
+ * 官方机器人收到的消息只有发送时间和内容，消息 ID 其他协议机器人用不了：到其他协议机器人的消息记录里按时间、内容找同一条。
  * filter 用来限定消息类型（如合并转发）；限定了类型时，按内容找不到就取时间最接近的那条
  */
 function sameMessage (history, time, text, filter, sender) {
@@ -164,8 +164,8 @@ function sameMessage (history, time, text, filter, sender) {
 const isBotMsg = m => (globalThis.Bot?.uin || []).map(String).includes(senderOf(m))
 
 /**
- * 是不是发起请求的这条消息本身（野生号这边的记录）：同一个人、时间相差 10 秒内、内容包含这条消息的文字。
- * 官方机器人和野生号记录的时间可能差一两秒，不能只按时间排除
+ * 是不是发起请求的这条消息本身（其他协议机器人这边的记录）：同一个人、时间相差 10 秒内、内容包含这条消息的文字。
+ * 官方机器人和其他协议机器人记录的时间可能差一两秒，不能只按时间排除
  */
 function isCurrent (e, m) {
   if (isWildBot(e.bot) && e.message_id && m.message_id === e.message_id) return true
@@ -175,8 +175,8 @@ function isCurrent (e, m) {
 }
 
 /**
- * 被引用的那条消息（野生号这边的消息对象）；没有引用时返回 null
- * 当前机器人是野生号时直接取引用，官方机器人收到的引用到野生号的消息记录里找。
+ * 被引用的那条消息（其他协议机器人这边的消息对象）；没有引用时返回 null
+ * 当前机器人是其他协议机器人时直接取引用，官方机器人收到的引用到其他协议机器人的消息记录里找。
  * 官方机器人没收到被引用的消息时（没有 @ 机器人的消息收不到），引用信息里的时间是这条请求的时间，
  * 所以只在这条请求之前的消息里找，并排除请求本身
  */
@@ -190,7 +190,7 @@ export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) 
     .filter(m => !isCurrent(e, m))
   const time = Number(e.source.time) || now
   const sender = /^\d{5,12}$/.test(String(e.source.user_id ?? '')) ? String(e.source.user_id) : ''
-  // 引用信息里的文字是官方接口给的原文，图片、表情等写法和野生号的记录对不上；
+  // 引用信息里的文字是官方接口给的原文，图片、表情等写法和其他协议机器人的记录对不上；
   // 官方机器人的消息记录（getReply）有消息段，转成同样的写法再比一次
   const texts = [...new Set([e.source.message, reply?.message && textOf(reply)].filter(t => t !== undefined && t !== null))]
   for (const who of sender ? [sender, ''] : ['']) {
@@ -207,10 +207,10 @@ export async function quotedMessage (e, bot, gid, { filter, scan = SCAN } = {}) 
     if (near) return near
   }
   const brief = String(e.source.message ?? '').replace(/\s+/g, ' ').slice(0, 30)
-  throw new Error(`没有在群消息记录里找到被引用的那条消息（引用信息：${Number.isFinite(time) ? beijing(time * 1000) : '时间未知'}，内容「${brief}」，野生号最近 ${history.length} 条记录里没有对上的）`)
+  throw new Error(`没有在群消息记录里找到被引用的那条消息（引用信息：${Number.isFinite(time) ? beijing(time * 1000) : '时间未知'}，内容「${brief}」，其他协议机器人最近 ${history.length} 条记录里没有对上的）`)
 }
 
-/** 当前这条消息（野生号这边的消息对象）：给发消息的人贴表情等用 */
+/** 当前这条消息（其他协议机器人这边的消息对象）：给发消息的人贴表情等用 */
 export async function currentMessage (e, bot, gid) {
   if (isWildBot(e.bot) && e.bot === bot && e.message_id) return { message_id: e.message_id, seq: e.seq, time: e.time, user_id: e.user_id, message: e.message }
   const found = sameMessage(await fetchHistory(bot, gid, 50), Number(e.time) || Date.now() / 1000, e.msg ?? e.raw_message)
@@ -235,9 +235,9 @@ export async function recentMessages (e, bot, gid, { users, keyword, count = 1, 
     .slice(-count)
 }
 
-/* ---------- 调用野生号的接口 ---------- */
+/* ---------- 调用其他协议机器人的接口 ---------- */
 
-/** 当前机器人是野生号时用它，否则用任意一个在线的野生号（账号设置、好友等与群无关的操作） */
+/** 当前机器人是其他协议机器人时用它，否则用任意一个在线的其他协议机器人（账号设置、好友等与群无关的操作） */
 export function anyWild (e) {
   if (isWildBot(e?.bot)) return e.bot
   for (const id of globalThis.Bot?.uin || []) if (isWildBot(globalThis.Bot[id])) return globalThis.Bot[id]
@@ -253,7 +253,7 @@ export function failure (ret) {
 }
 
 /**
- * 依次尝试几种调用方式，第一种存在的执行；都不存在时说明野生号不支持
+ * 依次尝试几种调用方式，第一种存在的执行；都不存在时说明其他协议机器人不支持
  * calls: [[对象, 方法名, 参数数组], ...]，最后可以给 [bot, 'sendApi', [action, params]] 走 OneBot 接口
  */
 export async function invoke (calls, label = '这个操作') {
@@ -264,5 +264,5 @@ export async function invoke (calls, label = '这个操作') {
     if (error) throw new Error(error)
     return ret?.data ?? ret
   }
-  throw new Error(`野生号不支持${label}`)
+  throw new Error(`其他协议机器人不支持${label}`)
 }

@@ -41,7 +41,7 @@ export class SearchChatHistoryTool extends CustomTool {
     const groupId = String(e.group_id)
     if (!/^\d{5,12}$/.test(groupId)) return '这个群还没有群绑定（不知道真实群号），无法读取聊天记录'
     const bot = chat.isWildBot(e.bot) ? e.bot : chat.wildInGroup(groupId)
-    if (!bot) return '这个群里没有在线的野生号，无法读取聊天记录'
+    if (!bot) return '这个群里没有在线的其他协议机器人，无法读取聊天记录'
 
     const keyword = String(args.keyword || '').trim().toLowerCase()
     const userId = String(args.user_id || '').replace(/^@/, '').trim()

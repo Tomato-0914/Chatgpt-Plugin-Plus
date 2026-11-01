@@ -35,7 +35,7 @@ async function trySend (attempts) {
   throw new Error(errors.join('；') || '没有可以发送的机器人')
 }
 
-/** 私聊发送：与对方是好友的野生号 → 当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给野生号）→ 同群野生号发临时会话 */
+/** 私聊发送：与对方是好友的其他协议机器人 → 当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给其他协议机器人）→ 同群的其他协议机器人发临时会话 */
 async function sendPrivate (e, uid, msg) {
   const attempts = []
   const bots = [...new Set([...(globalThis.Bot?.uin || [])].map(id => globalThis.Bot[id]))].filter(Boolean)
@@ -48,14 +48,14 @@ async function sendPrivate (e, uid, msg) {
   return await trySend(attempts)
 }
 
-/** 发到别的群：在群里的当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给野生号）→ 同群的野生号 */
+/** 发到别的群：在群里的当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给其他协议机器人）→ 同群的其他协议机器人 */
 async function sendGroup (e, gid, msg) {
   const attempts = []
   if (typeof e.bot?.pickGroup === 'function' && (inGroup(e.bot, gid) || !chat.isWildBot(e.bot))) {
     attempts.push(['当前机器人', () => e.bot.pickGroup(chat.asId(gid)).sendMsg(msg)])
   }
   const wild = chat.wildInGroup(gid)
-  if (wild && wild !== e.bot) attempts.push([`野生号（${wild.uin}）`, () => wild.pickGroup(Number(gid)).sendMsg(msg)])
+  if (wild && wild !== e.bot) attempts.push([`其他协议机器人（${wild.uin}）`, () => wild.pickGroup(Number(gid)).sendMsg(msg)])
   if (!attempts.length) throw new Error('机器人不在这个群里')
   return await trySend(attempts)
 }

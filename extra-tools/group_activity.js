@@ -133,7 +133,7 @@ export class GroupActivityTool extends CustomTool {
 
   function = {
     name: 'group_activity',
-    description: 'QQ 群的活跃数据（需要同群的野生号）：群星级（level）、龙王和群荣誉，' +
+    description: 'QQ 群的活跃数据（需要同群的其他协议机器人）：群星级（level）、龙王和群荣誉，' +
       '包括群聊之火、群聊炽焰、冒尖小春笋、快乐源泉（honor）、今日群打卡名单（sign_in）、发言排行榜（speak_rank）、' +
       '消息数、入群退群人数等群数据（data）。用户问“谁是龙王”“谁话最多”“群几星”“今天谁打卡了”时调用。' +
       '群友只能查当前群，主人可以用 group_id 指定其他群。',

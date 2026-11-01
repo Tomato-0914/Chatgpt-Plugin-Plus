@@ -93,7 +93,7 @@ async function current (e) {
   lines.push(`机器人：${botName}（${e.self_id}），${isOfficial(e) ? 'QQ 官方机器人' : chat.isWildBot(e.bot) ? `QQ 号机器人（${e.bot.adapter.name}）` : e.bot?.adapter?.name || '未知适配器'}`)
   if (isOfficial(e) && e.group_id) {
     const wild = chat.wildInGroup(e.group_id)
-    lines.push(`同群野生号：${wild ? `有（${wild.uin}），读群消息记录、合并转发等由它代办` : '没有，读不到群消息记录'}`)
+    lines.push(`同群的其他协议机器人：${wild ? `有（${wild.uin}），读群消息记录、合并转发等由它代办` : '没有，读不到群消息记录'}`)
   }
   if (e.time) lines.push(`消息时间：${time(e.time)}`)
   lines.push(`引用：${e.source || e.reply_id ? '有（用 action=reply 读取被引用的内容）' : '没有'}`)

@@ -2,7 +2,7 @@
  * 群信息类工具（group_info、group_members、group_activity、lucky_word、member_info）共用的辅助函数
  *
  * 群友只能查当前群，主人可以用 group_id 指定机器人加入的其他群。
- * 官方机器人拉不全群成员、查不了群资料，交给同群的野生号（Cheshire-Plugin 的野生号代办，或这里直接找同群野生号）。
+ * 官方机器人拉不全群成员、查不了群资料，交给同群的其他协议机器人（Cheshire-Plugin 的其他协议机器人代办，或这里直接找同群的其他协议机器人）。
  * 以 _ 开头，不会被当成工具登记。
  */
 import path from 'node:path'
@@ -48,28 +48,28 @@ export function target (e, groupId) {
 
 const inGroup = (bot, gid) => bot?.gl?.has?.(Number(gid)) || bot?.gl?.has?.(String(gid))
 
-/** 能直接查这个群的野生号：当前机器人就是野生号且在群里时用它，否则找同群的野生号 */
+/** 能直接查这个群的其他协议机器人：当前机器人就是其他协议机器人且在群里时用它，否则找同群的其他协议机器人 */
 export function wildFor (e, gid) {
   if (chat.isWildBot(e?.bot) && (inGroup(e.bot, gid) || String(e.group_id) === String(gid))) return e.bot
   return chat.wildInGroup(gid)
 }
 
-/** 必须用野生号的功能（网页接口）：找不到时说明原因 */
+/** 必须用其他协议机器人的功能（网页接口）：找不到时说明原因 */
 export function requireWild (e, gid) {
   const bot = wildFor(e, gid)
   if (bot) return bot
-  if (!isQQ(gid)) throw new Error('这个群还没有群绑定（拿不到真实群号），无法交给野生号查询')
-  throw new Error('这个群里没有野生号：这项数据要用 QQ 账号的网页登录凭据查询，官方机器人查不了')
+  if (!isQQ(gid)) throw new Error('这个群还没有群绑定（拿不到真实群号），无法交给其他协议机器人查询')
+  throw new Error('这个群里没有其他协议机器人：这项数据要用 QQ 账号的网页登录凭据查询，官方机器人查不了')
 }
 
-/** 群对象：当前群直接用 e.group（官方机器人缺的方法由 Cheshire-Plugin 交给野生号），其他群用野生号或当前机器人去取 */
+/** 群对象：当前群直接用 e.group（官方机器人缺的方法由 Cheshire-Plugin 交给其他协议机器人），其他群用其他协议机器人或当前机器人去取 */
 export function groupOf (e, gid, current) {
   if (current && e.group) return e.group
   const bot = wildFor(e, gid) || e.bot
   return bot?.pickGroup?.(chat.asId(gid))
 }
 
-/** 群成员列表：优先 getMemberMap（官方机器人由野生号补全），没有时用 getMemberList */
+/** 群成员列表：优先 getMemberMap（官方机器人由其他协议机器人补全），没有时用 getMemberList */
 export async function members (group) {
   if (typeof group?.getMemberMap === 'function') {
     const map = await group.getMemberMap()
@@ -86,7 +86,7 @@ export async function members (group) {
 /** 群成员列表，拉不到时报错：机器人自己就在群里，空列表只能是没拉到，不能当成“群里没有人” */
 export async function requireMembers (group) {
   const list = await members(group)
-  if (!list.length) throw new Error('没有拉到群成员列表（官方机器人需要同群有野生号）')
+  if (!list.length) throw new Error('没有拉到群成员列表（官方机器人需要同群有其他协议机器人）')
   return list
 }
 
@@ -99,7 +99,7 @@ function fill (target, src) {
   }
 }
 
-/** 群资料：野生号的数据（真实群号）优先，再用当前机器人的补 */
+/** 群资料：其他协议机器人的数据（真实群号）优先，再用当前机器人的补 */
 export async function groupInfo (e, gid, current) {
   const info = {}
   const wild = wildFor(e, gid)
@@ -117,7 +117,7 @@ export async function groupInfo (e, gid, current) {
 }
 
 /**
- * 机器人（一般是同群野生号）在群里的身份：owner / admin / member，拿不到时返回空串（交给接口自己报错）
+ * 机器人（一般是同群的其他协议机器人）在群里的身份：owner / admin / member，拿不到时返回空串（交给接口自己报错）
  * ICQQ 的群对象有 is_owner / is_admin；其他的查机器人自己的成员信息，再不行翻成员列表
  */
 export async function botRole (bot, gid) {

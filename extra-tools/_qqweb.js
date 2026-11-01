@@ -2,7 +2,7 @@
  * QQ 网页接口（qun.qq.com 等）共用的请求方法
  *
  * 群星级、群荣誉、打卡、发言榜、群公告、幸运字符这些数据只能用 QQ 账号的网页登录凭据（cookies）去查，
- * 官方机器人没有 QQ 账号，一律交给同群的野生号：ICQQ 自带 cookies，OneBotv11 通过 get_cookies 获取。
+ * 官方机器人没有 QQ 账号，一律交给同群的其他协议机器人：ICQQ 自带 cookies，OneBotv11 通过 get_cookies 获取。
  * 以 _ 开头，不会被当成工具登记。
  */
 
@@ -23,14 +23,14 @@ const cookieValue = (cookie, name) => cookie.match(new RegExp(`(?:^|;\\s*)${name
 const cookiesOf = ret => (typeof ret === 'string' ? ret : ret?.cookies || ret?.data?.cookies || (typeof ret?.data === 'string' ? ret.data : ''))
 
 /**
- * 野生号在某个域名下的登录凭据
+ * 其他协议机器人在某个域名下的登录凭据
  * @returns {Promise<{ cookie: string, bkn: number, gtk: number, uin: string }>}
  */
 export async function credentials (bot, domain = 'qun.qq.com') {
   let cookie = bot?.cookies?.[domain] || ''
   if (!cookie && typeof bot?.getCookies === 'function') cookie = cookiesOf(await bot.getCookies(domain).catch(() => ''))
   if (!cookie && typeof bot?.sendApi === 'function') cookie = cookiesOf(await bot.sendApi('get_cookies', { domain }).catch(() => ''))
-  if (!cookie) throw new Error(`野生号拿不到 ${domain} 的登录凭据（协议端不支持 get_cookies）`)
+  if (!cookie) throw new Error(`其他协议机器人拿不到 ${domain} 的登录凭据（协议端不支持 get_cookies）`)
   const skey = cookieValue(cookie, 'skey')
   const pskey = cookieValue(cookie, 'p_skey')
   return {
@@ -59,7 +59,7 @@ export async function request (url, { cookie, method = 'GET', body, headers = {}
     return JSON.parse(text)
   } catch {
     if (!res.ok) throw new Error(`接口返回 HTTP ${res.status}`)
-    throw new Error('接口没有返回数据，野生号的网页登录凭据可能已失效')
+    throw new Error('接口没有返回数据，其他协议机器人的网页登录凭据可能已失效')
   }
 }
 
@@ -86,7 +86,7 @@ export async function honorPage (cred, groupId, type) {
     signal: AbortSignal.timeout(TIMEOUT)
   })
   const state = initialState(await res.text())
-  if (!state) throw new Error('没有读到群荣誉数据，野生号的网页登录凭据可能已失效')
+  if (!state) throw new Error('没有读到群荣誉数据，其他协议机器人的网页登录凭据可能已失效')
   return state
 }
 

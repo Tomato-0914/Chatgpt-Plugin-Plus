@@ -122,7 +122,7 @@ function groupHistoryCacheTTLMs () {
  */
 /**
  * 拉群聊记录用的机器人：QQ 官方机器人只收得到 @ 它的消息，用它拉的群聊记录里没有群友之间的聊天。
- * 同一个群里有 QQ 号机器人（OneBotv11 / ICQQ，如 QQBot-Plugin 的野生号）时改用它拉，拿不到再用回官方机器人。
+ * 同一个群里有其他协议机器人（用 QQ 号登录的 OneBotv11 / ICQQ）时改用它拉，拿不到再用回官方机器人。
  * @returns {{ bot: *, groupId: * }}
  */
 function historySource (e) {
