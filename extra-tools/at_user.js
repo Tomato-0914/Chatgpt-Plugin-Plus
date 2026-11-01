@@ -4,7 +4,7 @@ import { CustomTool } from 'chaite'
 
 const chat = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_chat.js')).href)
 
-/** 群名片或昵称：官方机器人 @ 不到人时写名字用（官方机器人查群成员由 QQBot-Plugin 交给野生号） */
+/** 群名片或昵称：官方机器人 @ 不到人时写名字用（官方机器人查群成员由 Cheshire-Plugin 交给野生号） */
 async function nameOf (e, id) {
   try {
     const info = await e.group?.pickMember?.(chat.asId(id))?.getInfo?.()

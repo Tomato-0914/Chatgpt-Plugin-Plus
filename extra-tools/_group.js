@@ -2,7 +2,7 @@
  * 群信息类工具（group_info、group_members、group_activity、lucky_word、member_info）共用的辅助函数
  *
  * 群友只能查当前群，主人可以用 group_id 指定机器人加入的其他群。
- * 官方机器人拉不全群成员、查不了群资料，交给同群的野生号（QQBot-Plugin 的野生号代办，或这里直接找同群野生号）。
+ * 官方机器人拉不全群成员、查不了群资料，交给同群的野生号（Cheshire-Plugin 的野生号代办，或这里直接找同群野生号）。
  * 以 _ 开头，不会被当成工具登记。
  */
 import path from 'node:path'
@@ -62,7 +62,7 @@ export function requireWild (e, gid) {
   throw new Error('这个群里没有野生号：这项数据要用 QQ 账号的网页登录凭据查询，官方机器人查不了')
 }
 
-/** 群对象：当前群直接用 e.group（官方机器人缺的方法由 QQBot-Plugin 交给野生号），其他群用野生号或当前机器人去取 */
+/** 群对象：当前群直接用 e.group（官方机器人缺的方法由 Cheshire-Plugin 交给野生号），其他群用野生号或当前机器人去取 */
 export function groupOf (e, gid, current) {
   if (current && e.group) return e.group
   const bot = wildFor(e, gid) || e.bot

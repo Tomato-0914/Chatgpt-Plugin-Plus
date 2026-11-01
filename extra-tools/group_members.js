@@ -41,7 +41,7 @@ async function check (e, group, uid) {
     const m = list.find(i => String(i.user_id) === String(uid))
     return m ? `${uid} 在群里：${grp.line(m)}${m.join_time ? `，${grp.time(m.join_time)} 入群` : ''}` : `${uid} 不在这个群里`
   }
-  // 官方机器人的 openid：由 QQBot-Plugin 换成 QQ 号后交给野生号查资料
+  // 官方机器人的 openid：由 Cheshire-Plugin 换成 QQ 号后交给野生号查资料
   const member = group?.pickMember?.(uid)
   if (typeof member?.getInfo !== 'function') return '当前机器人查不了这个用户，请提供 QQ 号'
   const info = await member.getInfo()

@@ -2,7 +2,7 @@
  * 提醒任务的存储与定时发送（reminder 工具共用）
  *
  * 提醒保存在 plugins/chatgpt-plugin/data/reminders.json，重启后继续有效；每 20 秒检查一次到点的提醒，
- * 用创建提醒时的机器人发到原来的群或私聊。官方机器人主动消息发不出时，由 QQBot-Plugin 交给野生号发送。
+ * 用创建提醒时的机器人发到原来的群或私聊。官方机器人主动消息发不出时，由 Cheshire-Plugin 交给野生号发送。
  * 插件启动时由 apps/extraTools.js 调用 start()；以 _ 开头，不会被当成工具登记。
  */
 import fs from 'node:fs'
