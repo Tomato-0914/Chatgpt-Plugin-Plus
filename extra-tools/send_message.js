@@ -35,7 +35,7 @@ async function trySend (attempts) {
   throw new Error(errors.join('；') || '没有可以发送的机器人')
 }
 
-/** 私聊发送：与对方是好友的野生号 → 当前机器人（官方机器人发不出时由 QQBot-Plugin 交给野生号）→ 同群野生号发临时会话 */
+/** 私聊发送：与对方是好友的野生号 → 当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给野生号）→ 同群野生号发临时会话 */
 async function sendPrivate (e, uid, msg) {
   const attempts = []
   const bots = [...new Set([...(globalThis.Bot?.uin || [])].map(id => globalThis.Bot[id]))].filter(Boolean)
@@ -48,7 +48,7 @@ async function sendPrivate (e, uid, msg) {
   return await trySend(attempts)
 }
 
-/** 发到别的群：在群里的当前机器人（官方机器人发不出时由 QQBot-Plugin 交给野生号）→ 同群的野生号 */
+/** 发到别的群：在群里的当前机器人（官方机器人发不出时由 Cheshire-Plugin 交给野生号）→ 同群的野生号 */
 async function sendGroup (e, gid, msg) {
   const attempts = []
   if (typeof e.bot?.pickGroup === 'function' && (inGroup(e.bot, gid) || !chat.isWildBot(e.bot))) {
