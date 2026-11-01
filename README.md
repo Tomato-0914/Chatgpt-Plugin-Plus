@@ -293,7 +293,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 109 | `get_image_info` |  | 获取图片的基本信息（尺寸、格式等） | low |  |
 | 110 | `send_image` | `send_image` | 发送图片消息 | high | ✅ |
 | 111 | `send_video` |  | 发送短视频消息 | high |  |
-| 112 | `parse_video` |  | 获取消息中的视频信息 | low |  |
+| 112 | `parse_video` | `file_read`（source=quote / message） | 获取消息中的视频信息 | low | 🆕 |
 | 113 | `send_dice` |  | 发送骰子表情 | high |  |
 | 114 | `send_rps` |  | 发送猜拳表情（石头剪刀布） | high |  |
 | 115 | `send_music` | `send_music` | 发送音乐分享卡片 | high | ✅ |
@@ -318,7 +318,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 134 | `github_repo_info` |  | 获取GitHub仓库的详细信息 | low |  |
 | 135 | `ai_image_edit` |  | 使用AI编辑图片，使用框架配置的图片模型 | high |  |
 | 136 | `bilibili_video_summary` |  | 获取B站视频的AI总结，包含视频摘要、大纲和精选弹幕 | low |  |
-| 137 | `video_analysis` |  | 分析视频内容，支持从消息中获取视频或提供视频URL，使用智谱AI进行视频理解 | low |  |
+| 137 | `video_analysis` | `file_read`（截取画面交给 look_at_image） | 分析视频内容，支持从消息中获取视频或提供视频URL，使用智谱AI进行视频理解 | low | 🆕 |
 | 138 | `ai_mindmap` |  | 生成思维导图，基于描述生成Markmap格式的思维导图并渲染为图片 | low |  |
 | 139 | `hitokoto` |  | 获取一条随机的一言（名言、语录、台词等） | low |  |
 | 140 | `roll_dice` |  | 掷骰子，支持多种格式如 2d6（投2个6面骰子）、1d20+5（投1个20面骰子加5） | low |  |
@@ -364,7 +364,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 180 | `get_private_file_url` |  | 获取私聊文件下载链接 | low |  |
 | 181 | `download_file` | `file_download` | 下载文件到插件受管临时目录。 | high | ✅ |
 | 182 | `send_file_message` | `file_send` | 发送文件消息（群聊或私聊） | high | ✅ |
-| 183 | `get_file` | `file_read` | 获取文件信息（支持私聊和群聊文件） | low | ✅ |
+| 183 | `get_file` | `file_read`（source=quote / message） | 获取文件信息（支持私聊和群聊文件） | low | 🆕 |
 | 184 | `ocr_image` | ikechan 内置识图 | 图片OCR文字识别 | low |  |
 | 185 | `can_send_record` |  | 检查是否可以发送语音 | low |  |
 | 186 | `can_send_image` |  | 检查是否可以发送图片 | low |  |
@@ -410,14 +410,14 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 226 | `get_ai_voice_characters` |  | 【查询】获取AI声聊可用的角色/音色列表。 | low |  |
 | 227 | `send_ai_voice` |  | 【发送】AI语音消息到群聊（使用QQ的AI声聊功能合成语音）。 | high |  |
 | 228 | `send_voice` |  | 发送语音消息（直接发送语音文件） | high |  |
-| 229 | `parse_voice` |  | 获取消息中的语音信息 | low |  |
-| 230 | `get_record` |  | 获取语音文件详情（转换格式等） | low |  |
+| 229 | `parse_voice` | `file_read`（source=quote / message） | 获取消息中的语音信息 | low | 🆕 |
+| 230 | `get_record` | `file_read`（语音转成 mp3 读信息） | 获取语音文件详情（转换格式等） | low | 🆕 |
 | 231 | `get_tts_speakers` |  | 【查询】获取VITS语音合成可用的角色/音色列表。 | low |  |
 | 232 | `send_tts` |  | 发送TTS语音消息（使用 VITS 语音合成，支持多种角色和语言） | high |  |
 | 233 | `get_ai_record` |  | 【获取数据】仅获取AI语音的文件数据，不会发送消息。 | low |  |
 | 234 | `send_private_ai_record` |  | 发送私聊AI语音消息。 | high |  |
-| 235 | `get_voice_info` |  | 获取语音消息的详细信息（包括下载URL） | low |  |
-| 236 | `download_voice` |  | 下载语音文件 | low |  |
+| 235 | `get_voice_info` | `file_read`（source=quote / message） | 获取语音消息的详细信息（包括下载URL） | low | 🆕 |
+| 236 | `download_voice` | `file_read`（存到工作目录 chat-files） | 下载语音文件 | low | 🆕 |
 | 237 | `voice_to_text` |  | 语音转文字（语音识别） | low |  |
 | 238 | `get_ai_voice_status` |  | 【查询】群AI声聊功能是否可用（仅查询状态，不发送消息）。 | low |  |
 | 239 | `list_voice_formats` |  | 列出支持的语音格式 | low |  |
