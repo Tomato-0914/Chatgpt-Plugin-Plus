@@ -6,6 +6,7 @@ import { Chaite, CustomTool } from 'chaite'
 const dir = './plugins/chatgpt-plugin/extra-tools'
 const chat = await import(pathToFileURL(path.resolve(dir, '_chat.js')).href)
 const grp = await import(pathToFileURL(path.resolve(dir, '_group.js')).href)
+const quote = await import(pathToFileURL(path.resolve(dir, '_quote.js')).href)
 
 let Config
 const config = async () => (Config ??= (await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/config/config.js')).href)).default)
@@ -53,116 +54,6 @@ async function clearConversation (e, userId) {
   await storage.setItem(String(userId), fresh(state))
   pendingClear.set(String(userId), Date.now() + CLEAR_TTL)
   return `已结束${userId === String(e.user_id) ? '' : ` ${userId} 的`}当前对话，这条回复之后开始新对话（之前的对话内容不再带入；群聊上下文是群里的聊天记录，不受影响）`
-}
-
-/* ---------- 消息内容 ---------- */
-
-/** 卡片消息的标题 / 简介；合并转发卡片返回 forward */
-function cardText (data) {
-  try {
-    const json = typeof data === 'string' ? JSON.parse(data) : data
-    if (json?.app === 'com.tencent.multimsg') return 'forward'
-    const meta = Object.values(json?.meta || {})[0] || {}
-    return [json?.prompt, meta.title, meta.desc].filter(Boolean).join(' ').trim()
-  } catch {
-    return ''
-  }
-}
-
-/** 消息段转成给 AI 看的文字 */
-function contentOf (msg) {
-  const segs = Array.isArray(msg?.message) ? msg.message : null
-  if (!segs) return String(msg?.raw_message ?? msg?.message ?? '').trim() || '（无文字）'
-  const parts = []
-  for (const seg of segs) {
-    if (!seg || typeof seg !== 'object') {
-      parts.push(String(seg ?? ''))
-      continue
-    }
-    const data = seg.data && typeof seg.data === 'object' ? seg.data : seg
-    switch (seg.type) {
-      case 'text': parts.push(data.text ?? ''); break
-      case 'at': parts.push(`@${data.text?.replace(/^@/, '') || data.name || data.qq}(${data.qq}) `); break
-      case 'reply': break
-      case 'image': parts.push(data.summary && data.summary !== '[图片]' ? `[图片：${data.summary}]` : '[图片]'); break
-      case 'face': case 'mface': case 'bface': parts.push(data.summary || data.text ? `[表情：${data.summary || data.text}]` : '[表情]'); break
-      case 'file': parts.push(`[文件：${data.name || data.file || ''}]`); break
-      case 'markdown': parts.push(String(data.content ?? data.data ?? '')); break
-      case 'forward': case 'node': parts.push('[合并转发的聊天记录，可以用 forward_msg 工具读取]'); break
-      case 'json': case 'xml': {
-        const card = cardText(data.data ?? seg.data)
-        parts.push(card === 'forward' ? '[合并转发的聊天记录，可以用 forward_msg 工具读取]' : `[卡片${card ? `：${card}` : ''}]`)
-        break
-      }
-      case 'record': parts.push('[语音]'); break
-      case 'video': parts.push('[视频]'); break
-      default: parts.push(`[${seg.type}]`)
-    }
-  }
-  return parts.join('').replace(/\s+/g, ' ').trim() || '（无文字）'
-}
-
-/** 发消息的人：名字（QQ），机器人自己的标出来 */
-function senderOf (e, msg) {
-  const uid = chat.senderOf(msg)
-  const name = msg?.sender?.card || msg?.sender?.nickname || ''
-  const bot = uid && grp.botIds(e).has(uid) ? '（机器人自己）' : msg?.sender?.bot || msg?.direction === 'outgoing' ? '（机器人自己）' : ''
-  return `${name}${uid ? `（${uid}）` : ''}${bot}` || '未知'
-}
-
-/** 这条消息又引用了哪条：reply 消息段，或 source */
-function replyIdOf (msg) {
-  const seg = (Array.isArray(msg?.message) ? msg.message : []).find(s => s?.type === 'reply')
-  return seg ? (seg.id ?? seg.data?.id) : msg?.source?.message_id ?? msg?.source?.seq
-}
-
-/** 按消息 ID 取消息：群对象 / 机器人的 getMsg（官方机器人从 QQBot-Plugin 的消息记录取） */
-async function getMsg (bot, gid, id) {
-  if (id === undefined || id === null || id === '') return null
-  for (const fn of [() => gid && bot?.pickGroup?.(chat.asId(gid))?.getMsg?.(id), () => bot?.getMsg?.(id)]) {
-    try {
-      const m = await fn()
-      if (m && (m.message || m.raw_message)) return m
-    } catch {}
-  }
-  return null
-}
-
-/**
- * 被引用的那条消息：e.getReply()（野生号直接取，官方机器人从消息记录取）；
- * 官方机器人没收到被引用的消息时（没有 @ 机器人的消息收不到）只有预览，再到同群野生号的消息记录里找
- */
-async function quoted (e) {
-  let m = await e.getReply?.().catch(() => null)
-  if (!m && e.reply_id) m = await getMsg(e.bot, e.group_id, e.reply_id)
-  const gid = Number(e.group_id)
-  if (!chat.isWildBot(e.bot) && gid && (!m?.message_id || !chat.senderOf(m))) {
-    const wild = chat.wildInGroup(gid)
-    if (wild) m = await chat.quotedMessage(e, wild, gid).catch(() => m) || m
-  }
-  return m
-}
-
-async function replyText (e, depth) {
-  if (!e.source && !e.reply_id) return '这条消息没有引用其他消息'
-  const m = await quoted(e)
-  if (!m) return '这条消息引用了别的消息，但没有取到内容（可能太早了，或机器人没收到那条消息）'
-  const lines = [`被引用的消息：${senderOf(e, m)}${time(m.time) ? `，${time(m.time)}` : ''}`, contentOf(m)]
-
-  // 引用链：被引用的消息又引用了别的消息
-  const bot = chat.isWildBot(e.bot) ? e.bot : chat.wildInGroup(e.group_id) || e.bot
-  const seen = new Set([String(m.message_id ?? '')])
-  let cur = m
-  for (let i = 1; i <= depth; i++) {
-    const id = replyIdOf(cur)
-    if (id === undefined || id === null || seen.has(String(id))) break
-    seen.add(String(id))
-    const next = await getMsg(bot, e.group_id, id)
-    if (!next) break
-    lines.push('', `它引用的消息（第 ${i} 层）：${senderOf(e, next)}${time(next.time) ? `，${time(next.time)}` : ''}`, contentOf(next))
-    cur = next
-  }
-  return lines.join('\n')
 }
 
 /* ---------- @ 列表 ---------- */
@@ -285,7 +176,7 @@ export class ChatContextTool extends CustomTool {
         case 'current':
           return await current(e)
         case 'reply':
-          return await replyText(e, Math.min(Math.max(Math.floor(Number(args.depth ?? 2)) || 0, 0), MAX_CHAIN))
+          return await quote.replyText(e, Math.min(Math.max(Math.floor(Number(args.depth ?? 2)) || 0, 0), MAX_CHAIN))
         case 'at': {
           const list = await atList(e)
           return list.length ? `这条消息 @ 了 ${list.length} 个：\n${list.map((a, i) => `${i + 1}. ${a.line}`).join('\n')}` : '这条消息没有 @ 任何人'
