@@ -120,11 +120,37 @@ function groupHistoryCacheTTLMs () {
  * @param length
  * @returns {Promise<Array<*>>}
  */
+/**
+ * 拉群聊记录用的机器人：QQ 官方机器人只收得到 @ 它的消息，用它拉的群聊记录里没有群友之间的聊天。
+ * 同一个群里有 QQ 号机器人（OneBotv11 / ICQQ，如 QQBot-Plugin 的野生号）时改用它拉，拿不到再用回官方机器人。
+ * @returns {{ bot: *, groupId: * }}
+ */
+function historySource (e) {
+  if (e?.bot?.adapter?.id !== 'QQBot') return { bot: e?.bot, groupId: e?.group_id }
+  const gid = Number(e.group_id)
+  if (gid) {
+    for (const id of globalThis.Bot?.uin || []) {
+      const bot = globalThis.Bot[id]
+      if (['OneBotv11', 'ICQQ'].includes(bot?.adapter?.name) && (bot.gl?.has(gid) || bot.gl?.has(String(gid)))) {
+        return { bot, groupId: gid }
+      }
+    }
+  }
+  return { bot: e.bot, groupId: e.group_id }
+}
+
+async function collectHistory (bot, groupId, length) {
+  return getBotFramework() === 'trss'
+    ? await new TRSSGroupContextCollector().collect(bot, groupId, 0, length)
+    : await new ICQQGroupContextCollector().collect(bot, groupId, 0, length)
+}
+
 export async function getGroupHistory (e, length = 20) {
   const ttl = groupHistoryCacheTTLMs()
+  const source = historySource(e)
   // key 必须带上 bot 账号：多 bot 同处一个群时，各账号能看到的历史并不相同，
   // 只按 group_id 缓存会把一个账号拉到的历史喂给另一个账号。
-  const key = ttl > 0 ? `${e.bot?.uin ?? e.self_id ?? ''}:${e.group_id}:${length}` : ''
+  const key = ttl > 0 ? `${source.bot?.uin ?? e.self_id ?? ''}:${e.group_id}:${length}` : ''
   if (key) {
     const hit = groupHistoryCache.get(key)
     if (hit && (Date.now() - hit.at) < ttl) {
@@ -133,9 +159,15 @@ export async function getGroupHistory (e, length = 20) {
     }
   }
 
-  const chats = getBotFramework() === 'trss'
-    ? await new TRSSGroupContextCollector().collect(e.bot, e.group_id, 0, length)
-    : await new ICQQGroupContextCollector().collect(e.bot, e.group_id, 0, length)
+  let chats = []
+  if (source.bot !== e.bot) {
+    try {
+      chats = await collectHistory(source.bot, source.groupId, length)
+    } catch (err) {
+      logger.debug(`[GroupContext] 用同群的 ${source.bot?.uin} 拉群聊记录失败，改用当前机器人：${err.message}`)
+    }
+  }
+  if (!chats?.length) chats = await collectHistory(e.bot, e.group_id, length)
 
   if (key) {
     // 先删再塞，让 Map 的插入顺序等于访问顺序，超出上限时淘汰最旧的
