@@ -85,7 +85,7 @@ export class ForwardMsgTool extends CustomTool {
   function = {
     name: 'forward_msg',
     description: '读取合并转发的聊天记录（群聊的聊天记录卡片）的完整内容，嵌套的聊天记录也会展开。' +
-      '用户引用一条聊天记录让你总结、看看说了什么时调用（工具会自己读取引用，看不到内容也直接调用）；没有引用时读群里最近的一条聊天记录。需要同群的野生号。',
+      '用户引用一条聊天记录让你总结、看看说了什么时调用（工具会自己读取引用，看不到内容也直接调用）；没有引用时读群里最近的一条聊天记录。需要同群的其他协议机器人。',
     parameters: {
       type: 'object',
       properties: {},
@@ -101,13 +101,13 @@ export class ForwardMsgTool extends CustomTool {
       if (e.isGroup || e.group_id) {
         const gid = String(e.group_id)
         bot = grp.wildFor(e, gid)
-        if (!bot) return '这个群里没有野生号，官方机器人读不到合并转发的内容'
+        if (!bot) return '这个群里没有其他协议机器人，官方机器人读不到合并转发的内容'
         m = e.source
           ? await chat.quotedMessage(e, bot, gid, { filter: isForward })
           : (await chat.recentMessages(e, bot, gid, { filter: isForward }))[0]
         if (!m) return `最近 ${chat.SCAN} 条群消息里没有合并转发的聊天记录`
       } else {
-        // 私聊：只有野生号能读，且要引用那条聊天记录
+        // 私聊：只有其他协议机器人能读，且要引用那条聊天记录
         if (!chat.isWildBot(e.bot)) return '官方机器人在私聊里读不到合并转发的内容'
         bot = e.bot
         m = isForward(e) ? e : await e.getReply?.().catch(() => null)

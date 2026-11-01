@@ -9,7 +9,7 @@ import { PreProcessor, asyncLocalStorage } from 'chaite'
  * 群友引用了一条消息问“这说的什么”“这个文件写了啥”，AI 看不到被引用的内容，会说“你没发消息 / 图片 / 文件”。
  * 这个前置处理器在用户消息前面加上被引用消息的发送人、时间、内容（以及它又引用的那条），
  * 文件、语音、视频提示可以用 file_read 读取，合并转发提示用 forward_msg 读取。
- * 官方机器人没收到被引用的消息时（没有 @ 机器人的消息收不到）到同群野生号的消息记录里找。
+ * 官方机器人没收到被引用的消息时（没有 @ 机器人的消息收不到）到同群的其他协议机器人的消息记录里找。
  */
 
 const quote = await import(pathToFileURL(path.resolve('./plugins/chatgpt-plugin/extra-tools/_quote.js')).href)

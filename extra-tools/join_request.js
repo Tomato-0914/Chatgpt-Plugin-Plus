@@ -21,7 +21,7 @@ function explain (err) {
 
 /**
  * 当前群待处理的入群申请，统一成 { user_id, nickname, comment, flag, time, invitor, handle(approve, reason, block) }
- * 官方机器人（需要是群管理员）优先，不行再用同群野生号：OneBot 的 get_group_system_msg，ICQQ 的 getSystemMsg
+ * 官方机器人（需要是群管理员）优先，不行再用同群的其他协议机器人：OneBot 的 get_group_system_msg，ICQQ 的 getSystemMsg
  */
 async function requests (e, gid) {
   const errors = []
@@ -45,7 +45,7 @@ async function requests (e, gid) {
   }
 
   const wild = chat.isWildBot(e.bot) ? e.bot : chat.wildInGroup(gid)
-  if (!wild) throw new Error(errors[0] || '这个群里没有能查看入群申请的机器人（官方机器人需要是管理员，或同群有野生号）')
+  if (!wild) throw new Error(errors[0] || '这个群里没有能查看入群申请的机器人（官方机器人需要是管理员，或同群有其他协议机器人）')
   try {
     if (typeof wild.getSystemMsg === 'function') {
       // ICQQ：系统消息里只有还没处理的申请
@@ -77,7 +77,7 @@ async function requests (e, gid) {
       }]]], approve ? '同意入群申请' : '拒绝入群申请')
     }))
   } catch (err) {
-    throw new Error([...errors, `野生号：${explain(err)}`].join('；'))
+    throw new Error([...errors, `其他协议机器人：${explain(err)}`].join('；'))
   }
 }
 
@@ -90,7 +90,7 @@ export class JoinRequestTool extends CustomTool {
     name: 'join_request',
     description: '本群的入群申请：查看待处理的申请（list）、同意（approve）、拒绝（reject，可同时拉黑）。' +
       '查看只有主人和本群群主、管理员可以；同意 / 拒绝由主人、群主、管理员要求时直接执行，其他人要求时会 @ 主人申请确认（主人、群主、管理员都能确认，告诉用户等确认即可）。' +
-      '需要机器人是群管理员（官方机器人优先，不行再用同群的野生号）。user_id 写申请人的 QQ 号；只有一条申请时可以不填。不要编造申请人。',
+      '需要机器人是群管理员（官方机器人优先，不行再用同群的其他协议机器人）。user_id 写申请人的 QQ 号；只有一条申请时可以不填。不要编造申请人。',
     parameters: {
       type: 'object',
       properties: {
@@ -109,7 +109,7 @@ export class JoinRequestTool extends CustomTool {
         },
         block: {
           type: 'boolean',
-          description: 'reject 时是否同时拉黑，不让此人再申请，默认 false（野生号 OneBot 不支持）'
+          description: 'reject 时是否同时拉黑，不让此人再申请，默认 false（OneBot 协议不支持）'
         }
       },
       required: []

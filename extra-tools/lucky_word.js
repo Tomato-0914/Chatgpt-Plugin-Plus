@@ -39,7 +39,7 @@ export class LuckyWordTool extends CustomTool {
 
   function = {
     name: 'lucky_word',
-    description: 'QQ 群幸运字符（机器人自己账号的，需要同群的野生号）：查看机器人拥有和正在佩戴的字符（list）、' +
+    description: 'QQ 群幸运字符（机器人自己账号的，需要同群的其他协议机器人）：查看机器人拥有和正在佩戴的字符（list）、' +
       '每天抽一次字符（draw）、佩戴某个字符（equip）、开启或关闭本群的幸运字符功能（switch，需要机器人是管理员；主人、群主、管理员要求时直接执行，其他人要求时会申请确认，告诉用户等确认即可）。',
     parameters: {
       type: 'object',

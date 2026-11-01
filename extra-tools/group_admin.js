@@ -37,7 +37,7 @@ const explain = text => {
   return hit ? `${hit[1]}（${text}）` : text
 }
 
-/** 撤回用的机器人：官方机器人拉不到群消息记录，优先用同群的野生号 */
+/** 撤回用的机器人：官方机器人拉不到群消息记录，优先用同群的其他协议机器人 */
 function adminBot (e) {
   if (chat.isWildBot(e.bot)) return e.bot
   return chat.wildInGroup(e.group_id) || e.bot
@@ -89,12 +89,12 @@ async function officialAdmin (e) {
 }
 
 /**
- * 依次用官方机器人、同群野生号执行，前一个失败再换下一个；都失败时把每个的原因说出来
+ * 依次用官方机器人、同群的其他协议机器人执行，前一个失败再换下一个；都失败时把每个的原因说出来
  * @param {Array<[string, () => Promise<*>] | null>} tries [谁, 执行]，null 表示这个机器人不可用
  */
 async function tryEach (tries) {
   tries = tries.filter(Boolean)
-  if (!tries.length) throw new Error('没有能执行的机器人：官方机器人不是群管理员，这个群里也没有野生号')
+  if (!tries.length) throw new Error('没有能执行的机器人：官方机器人不是群管理员，这个群里也没有其他协议机器人')
   const errors = []
   for (const [who, fn] of tries) {
     try {
@@ -117,7 +117,7 @@ async function roleOf (groups, uid) {
   return ''
 }
 
-/** 野生号踢人：ICQQ 是 (QQ, 提示语, 拉黑)，OneBot 是 (QQ, 拉黑) */
+/** 其他协议机器人踢人：ICQQ 是 (QQ, 提示语, 拉黑)，OneBot 是 (QQ, 拉黑) */
 const wildKick = (bot, group, uid, block) => (bot.adapter?.name === 'ICQQ' ? group.kickMember(uid, '', block) : group.kickMember(uid, block))
 
 /**
@@ -141,7 +141,7 @@ async function officialOwn (e, count, keyword) {
 /**
  * 找出要撤回的消息，返回 { group, targets: [{ id, desc }] }，group 为执行撤回的群对象
  * 优先级：message_id → 引用的消息（“撤回这条”）→ 按 user_id / keyword 取最近的几条
- * 官方机器人自己发的消息走官方接口，其余的由同群野生号撤回
+ * 官方机器人自己发的消息走官方接口，其余的由同群的其他协议机器人撤回
  */
 async function locateRecall (e, bot, gid, args) {
   const group = bot.pickGroup(gid)
@@ -151,7 +151,7 @@ async function locateRecall (e, bot, gid, args) {
       // 官方机器人的消息 ID：只能由官方机器人撤回它自己发的消息
       const og = officialGroup(e)
       if (og) return { group: og, targets: [{ id, desc: `消息 ${id}` }] }
-      throw new Error('这是官方机器人的消息 ID，野生号用不了；请改为引用那条消息，或用 user_id / keyword 定位')
+      throw new Error('这是官方机器人的消息 ID，其他协议机器人用不了；请改为引用那条消息，或用 user_id / keyword 定位')
     }
     return { group, targets: [{ id, desc: `消息 ${id}` }] }
   }
@@ -172,7 +172,7 @@ async function locateRecall (e, bot, gid, args) {
     }
     if (userId === 'bot' || userId === String(e.self_id)) return officialOwn(e, count, keyword)
   }
-  if (!chat.isWildBot(bot)) throw new Error('这个群里没有野生号：官方机器人拉不到群消息记录，只能撤回它自己发的消息（user_id 写 bot）')
+  if (!chat.isWildBot(bot)) throw new Error('这个群里没有其他协议机器人：官方机器人拉不到群消息记录，只能撤回它自己发的消息（user_id 写 bot）')
 
   const describe = m => ({
     id: m.message_id,
@@ -180,7 +180,7 @@ async function locateRecall (e, bot, gid, args) {
     desc: `${m.sender?.card || m.sender?.nickname || ''}(${m.user_id ?? m.sender?.user_id})：${preview(chat.textOf(m))}`
   })
 
-  // 引用了一条消息并且没有给其他条件：撤回被引用的那条（官方机器人收到的引用到野生号的消息记录里找同一条）
+  // 引用了一条消息并且没有给其他条件：撤回被引用的那条（官方机器人收到的引用到其他协议机器人的消息记录里找同一条）
   if (useQuote) {
     try {
       return { group, targets: [describe(await chat.quotedMessage(e, bot, gid, { scan: RECALL_SCAN }))] }
@@ -190,7 +190,7 @@ async function locateRecall (e, bot, gid, args) {
   }
 
   if (!userId && !keyword) throw new Error('请引用要撤回的消息，或提供 user_id（谁发的，all 为不分是谁）/ keyword（内容关键词）')
-  // user_id：bot 为野生号自己发的（官方机器人的在前面已经处理）；all 为不分是谁发的（不含机器人）；多个 QQ 号用逗号分隔
+  // user_id：bot 为其他协议机器人自己发的（官方机器人的在前面已经处理）；all 为不分是谁发的（不含机器人）；多个 QQ 号用逗号分隔
   const all = /^(all|全部|所有人)$/i.test(userId)
   const users = userId === 'bot' ? [String(bot.uin)] : userId && !all ? userId.split(/[,，\s]+/).filter(Boolean) : null
   const bots = grp.botIds(e)
@@ -213,7 +213,7 @@ export class GroupAdminTool extends CustomTool {
       '不能对主人、机器人自己操作；管理员不能对群主、其他管理员操作。' +
       '操作对象要用 QQ 号：用户 @ 了人就用被 @ 的 QQ 号（只看到名字时用 chat_context 的 at 查）；不知道 QQ 号时（如“刚进群的那个人”“刚才刷屏的人”）' +
       '先用 group_members 的 recent_join（最近入群）、member_info（按名字搜）或 search_chat_history 查到 QQ 号再调用，不要编造 QQ 号，也不要直接回答做不到。' +
-      '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的野生号；名片、群名称、全员禁言、撤回别人的消息要同群野生号是管理员，头衔需要野生号是群主（权限不够时工具会直接说明）。' +
+      '禁言、踢人、拉黑优先用官方机器人（需要是管理员），不行再交给同群的其他协议机器人（和官方机器人在同一个框架里、用 QQ 号登录的 OneBot / ICQQ 机器人）；名片、群名称、全员禁言、撤回别人的消息要同群的其他协议机器人是管理员，头衔需要其他协议机器人是群主（权限不够时工具会直接说明）。' +
       '撤回：用户引用一条消息说“撤回这条 / 把这条撤回”时直接 action=recall，工具会自己读取引用的消息（包括机器人自己发的），即使你在上下文里看不到引用内容也不要拒绝或追问；要撤回某人最近的消息用 user_id + count（撤别人的就填别人的 QQ 号，几个人用逗号分隔；不分是谁、撤最近几条用 user_id=all），按内容撤回用 keyword；' +
       '撤回机器人自己发的消息时 user_id 写 bot（官方机器人自己的消息走官方接口撤回）。不要编造 message_id。',
     parameters: {
@@ -288,17 +288,17 @@ export class GroupAdminTool extends CustomTool {
     let level = self ? 'self' : 'manager'
     const who = self ? '你自己' : uid
 
-    // 名片、头衔、群名称、全员禁言官方机器人没有接口，只能交给同群野生号
-    const needWild = () => (wg ? null : '这个群里没有野生号，官方机器人没有改名片、设头衔、改群名称、全员禁言的接口')
+    // 名片、头衔、群名称、全员禁言官方机器人没有接口，只能交给同群的其他协议机器人
+    const needWild = () => (wg ? null : '这个群里没有其他协议机器人，官方机器人没有改名片、设头衔、改群名称、全员禁言的接口')
     /**
-     * 野生号的群权限够不够：改名片、改群名称、全员禁言至少要管理员，设头衔要群主。
+     * 其他协议机器人的群权限够不够：改名片、改群名称、全员禁言至少要管理员，设头衔要群主。
      * 不够时直接说明，不发申请（确认了也做不了）；查不到身份时照样执行，接口会报错
      */
     const needRole = async (min, what) => {
       const role = await grp.botRole(wild, gid)
       if (!role) return null
       if (min === 'owner' ? role === 'owner' : role === 'owner' || role === 'admin') return null
-      return `野生号在这个群${role === 'admin' ? '是管理员' : '不是管理员'}，${what}需要它是${min === 'owner' ? '群主' : '群主或管理员'}`
+      return `其他协议机器人在这个群${role === 'admin' ? '是管理员' : '不是管理员'}，${what}需要它是${min === 'owner' ? '群主' : '群主或管理员'}`
     }
 
     let title, run
@@ -308,7 +308,7 @@ export class GroupAdminTool extends CustomTool {
         title = `禁言 ${who} ${minutes} 分钟`
         run = () => tryEach([
           og && ['官方机器人', () => og.muteMember(target, minutes * 60)],
-          wg && ['野生号', () => wg.muteMember(target, minutes * 60)]
+          wg && ['其他协议机器人', () => wg.muteMember(target, minutes * 60)]
         ])
         break
       }
@@ -316,7 +316,7 @@ export class GroupAdminTool extends CustomTool {
         title = `解除 ${uid} 的禁言`
         run = () => tryEach([
           og && ['官方机器人', () => og.muteMember(target, 0)],
-          wg && ['野生号', () => wg.muteMember(target, 0)]
+          wg && ['其他协议机器人', () => wg.muteMember(target, 0)]
         ])
         break
       case 'kick': {
@@ -324,13 +324,13 @@ export class GroupAdminTool extends CustomTool {
         title = `把 ${who} 踢出群${block ? '并拉黑（不能再加群）' : ''}`
         run = () => tryEach([
           og && ['官方机器人', () => og.kickMember(target, block)],
-          wg && ['野生号', () => wildKick(wild, wg, target, block)]
+          wg && ['其他协议机器人', () => wildKick(wild, wg, target, block)]
         ])
         break
       }
       case 'blacklist': {
         if (!(await approval.isManager(e))) return '只有主人和本群群主、管理员可以查看群黑名单'
-        if (typeof og?.getBlacklist !== 'function') return '只有官方机器人（需要是群管理员）能查看群黑名单，野生号没有这个接口'
+        if (typeof og?.getBlacklist !== 'function') return '只有官方机器人（需要是群管理员）能查看群黑名单，其他协议机器人没有这个接口'
         try {
           const list = await og.getBlacklist()
           if (!list.length) return '群黑名单是空的'
@@ -343,7 +343,7 @@ export class GroupAdminTool extends CustomTool {
       case 'blacklist_remove': {
         const add = action === 'blacklist_add'
         if (typeof og?.setBlacklist !== 'function') {
-          return `只有官方机器人（需要是群管理员）能${add ? '拉黑' : '移出黑名单'}，野生号没有群黑名单接口${add ? '；野生号可以踢人时拉黑（kick + reject_add）' : ''}`
+          return `只有官方机器人（需要是群管理员）能${add ? '拉黑' : '移出黑名单'}，其他协议机器人没有群黑名单接口${add ? '；其他协议机器人可以踢人时拉黑（kick + reject_add）' : ''}`
         }
         title = add ? `把 ${uid} 加入群黑名单（不能再加群）` : `把 ${uid} 移出群黑名单`
         run = async () => {
@@ -433,9 +433,9 @@ export class GroupAdminTool extends CustomTool {
         return 'action 不正确'
     }
     for (const [name, method] of [['set_card', 'setCard'], ['set_title', 'setTitle'], ['set_group_name', 'setName'], ['mute_all', 'muteAll'], ['unmute_all', 'muteAll']]) {
-      if (name === action && typeof wg[method] !== 'function') return '野生号不支持这个群管理操作'
+      if (name === action && typeof wg[method] !== 'function') return '其他协议机器人不支持这个群管理操作'
     }
-    if (['mute', 'unmute', 'kick'].includes(action) && !og && !wg) return '没有能执行的机器人：官方机器人不是群管理员，这个群里也没有野生号'
+    if (['mute', 'unmute', 'kick'].includes(action) && !og && !wg) return '没有能执行的机器人：官方机器人不是群管理员，这个群里也没有其他协议机器人'
 
     if (self) title = title.replace(/\s*你自己\s*/, '你自己').replace(/你自己(\d)/, '你自己 $1')
     // 结果里只带标题第一行（多条撤回时后面是消息列表）

@@ -7,7 +7,7 @@
  * - 本人级（self）：只和发起者自己有关的操作（禁言自己、踢自己、撤回自己的消息等）。谁发起都不直接执行，
  *   先 @ 发起者确认，只有发起者本人能确认 / 取消，其他任何人（包括主人）都不能代为处理
  *
- * 主人级、群管级：有权限的人发起时直接执行；其他人发起时不执行，先 @ 第一个主人发一条申请（官方机器人发 Markdown + 按钮，野生号发文字）：
+ * 主人级、群管级：有权限的人发起时直接执行；其他人发起时不执行，先 @ 第一个主人发一条申请（官方机器人发 Markdown + 按钮，其他协议机器人发文字）：
  *   - 回复「#确认」/「yes」/「Y」执行，「#拒绝」/「no」/「N」作废（不区分大小写）
  *   - 处理哪一条：点按钮就是按钮所在的那条（按钮带着申请编号）；引用某条申请回复就是被引用的那条；
  *     不引用时只有一条待处理才处理它，有多条时提示引用或点按钮，不猜
@@ -114,7 +114,7 @@ function newId () {
 }
 
 /**
- * 官方机器人的确认 / 拒绝按钮（野生号发按钮会报错，不发）：
+ * 官方机器人的确认 / 拒绝按钮（其他协议机器人发按钮会报错，不发）：
  * - 群管级第一行用 QQ 自带的「仅管理者」权限（admin），QQ 自己判定群主、管理员
  * - 主人：名单里放主人在本群的原始 openid（主人在这个群发过消息才知道，见 rememberMaster），
  *   群管级加一行「（主人）」，主人级就只有这一行；不知道时不发，主人引用申请回复
@@ -134,7 +134,7 @@ function buttons (e, id, level, { rawId, masters = [] } = {}) {
   return [globalThis.segment.button(...rows.map(r => [button(`✅ 确认${r.tag}`, `#确认 ${id}`, r.permission), button(`❌ 拒绝${r.tag}`, `#拒绝 ${id}`, r.permission)]))]
 }
 
-/** 发送结果里的消息 ID（官方机器人是数组，野生号是一个；ICQQ 还有 seq），用来对应引用回复 */
+/** 发送结果里的消息 ID（官方机器人是数组，其他协议机器人是一个；ICQQ 还有 seq），用来对应引用回复 */
 function sentIds (ret) {
   const ids = []
   for (const r of Array.isArray(ret) ? ret : [ret]) {
@@ -144,7 +144,7 @@ function sentIds (ret) {
   return ids
 }
 
-/** 这条消息引用的消息 ID：野生号的 reply 消息段、e.reply_id，官方机器人的 source.seq */
+/** 这条消息引用的消息 ID：其他协议机器人的 reply 消息段、e.reply_id，官方机器人的 source.seq */
 function quotedIds (e) {
   const ids = []
   for (const seg of Array.isArray(e.message) ? e.message : []) if (seg?.type === 'reply') ids.push(seg.id ?? seg.data?.id)
@@ -178,7 +178,7 @@ export async function guard (e, { title, run, level = 'master' }) {
     let ret
     if (e.isGroup || e.group_id) {
       const btn = buttons(e, id, level, { masters: await masterRawIds(e) })
-      // 官方机器人发 Markdown（带按钮），野生号发普通文字
+      // 官方机器人发 Markdown（带按钮），其他协议机器人发普通文字
       const how = btn.length ? `${who}点按钮，或引用这条消息回复` : `${who}引用这条消息回复`
       const body = e.bot?.adapter?.id === 'QQBot'
         ? { type: 'markdown', data: `\n**${head}**\n> 申请人：${md(requester)}\n> 操作：${md(title)}\n\n${how}「#确认」/ Y 执行、「#拒绝」/ N 取消` }

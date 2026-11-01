@@ -47,7 +47,7 @@ async function chatSegment (e, source) {
   } else {
     if (!e.source && !e.reply_id) throw new Error('这条消息没有引用其他消息')
     msg = await e.getReply?.().catch(() => null)
-    // 官方机器人没收到被引用的消息时只有预览，到同群野生号的消息记录里找
+    // 官方机器人没收到被引用的消息时只有预览，到同群的其他协议机器人的消息记录里找
     const has = m => (Array.isArray(m?.message) ? m.message : []).some(s => MEDIA_SEGS.includes(s?.type))
     if (!has(msg) && e.group_id && !chat.isWildBot(e.bot)) {
       const wild = chat.wildInGroup(e.group_id)
@@ -67,7 +67,7 @@ async function locate (e, seg) {
     if (localPath(v)) return { file: localPath(v) }
   }
   const bot = chat.isWildBot(e.bot) ? e.bot : chat.wildInGroup(e.group_id)
-  if (!bot) throw new Error('消息里没有文件地址，这个群也没有能代办的野生号')
+  if (!bot) throw new Error('消息里没有文件地址，这个群也没有能代办的其他协议机器人')
   const gid = Number(e.group_id)
   const pick = ret => {
     const r = ret?.data ?? ret

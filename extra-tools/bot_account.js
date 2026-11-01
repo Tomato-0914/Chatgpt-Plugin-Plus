@@ -26,7 +26,7 @@ async function tryCalls (calls, label) {
       if (!NO_API.test(err.message)) throw err
     }
   }
-  throw last || new Error(`野生号不支持${label}`)
+  throw last || new Error(`其他协议机器人不支持${label}`)
 }
 
 /** 每个操作：检查参数并返回 { title, run }，run 在主人确认后执行 */
@@ -35,15 +35,15 @@ const ACTIONS = {
     const gid = String(args.group_id ?? '').trim() || (e.isGroup || e.group_id ? String(e.group_id) : '')
     if (!isQQ(gid)) return '请提供要退出的群号'
     const bot = chat.wildInGroup(gid)
-    if (!bot) return `野生号不在群 ${gid} 里`
+    if (!bot) return `其他协议机器人不在群 ${gid} 里`
     return {
-      title: `让野生号 ${bot.uin} 退出群 ${gid}`,
+      title: `让其他协议机器人 ${bot.uin} 退出群 ${gid}`,
       run: async () => {
-        // 退的是当前群、而且是这个野生号在回复：退了就发不出消息了，先说一声
+        // 退的是当前群、而且是这个其他协议机器人在回复：退了就发不出消息了，先说一声
         const here = String(gid) === String(e.group_id)
         if (here && e.bot === bot) await e.reply('好的，这就退出本群，有缘再见～').catch(() => {})
         await chat.invoke([[bot.pickGroup(Number(gid)), 'quit'], [bot, 'sendApi', ['set_group_leave', { group_id: Number(gid) }]]], '退群')
-        return `野生号 ${bot.uin} 已退出群 ${gid}${here && e.bot === bot ? '（已在群里告别）' : ''}`
+        return `其他协议机器人 ${bot.uin} 已退出群 ${gid}${here && e.bot === bot ? '（已在群里告别）' : ''}`
       }
     }
   },
@@ -52,17 +52,17 @@ const ACTIONS = {
     const uid = await chat.realQQ(e, String(args.user_id ?? '').replace(/^@/, '').trim())
     if (!uid) return '请提供要删除的好友 QQ 号'
     const bot = chat.anyWild(e)
-    if (!bot) return '没有在线的野生号'
-    if (bot.fl && !bot.fl.has(Number(uid)) && !bot.fl.has(uid)) return `${uid} 不是野生号 ${bot.uin} 的好友`
+    if (!bot) return '没有在线的其他协议机器人'
+    if (bot.fl && !bot.fl.has(Number(uid)) && !bot.fl.has(uid)) return `${uid} 不是其他协议机器人 ${bot.uin} 的好友`
     return {
-      title: `让野生号 ${bot.uin} 删除好友 ${uid}`,
+      title: `让其他协议机器人 ${bot.uin} 删除好友 ${uid}`,
       run: async () => {
         await chat.invoke([
           [bot, 'deleteFriend', [Number(uid)]],
           [bot.pickFriend?.(Number(uid)), 'delete'],
           [bot, 'sendApi', ['delete_friend', { user_id: Number(uid), friend_id: Number(uid) }]]
         ], '删除好友')
-        return `野生号 ${bot.uin} 已删除好友 ${uid}`
+        return `其他协议机器人 ${bot.uin} 已删除好友 ${uid}`
       }
     }
   },
@@ -71,12 +71,12 @@ const ACTIONS = {
     const url = String(args.image_url ?? '').trim() || (Array.isArray(e.img) ? e.img[0] : '')
     if (!/^https?:\/\//i.test(url)) return '请提供新头像的图片地址（或在消息里附上图片）'
     const bot = chat.anyWild(e)
-    if (!bot) return '没有在线的野生号'
+    if (!bot) return '没有在线的其他协议机器人'
     return {
-      title: `把野生号 ${bot.uin} 的头像换成 ${short(url)}`,
+      title: `把其他协议机器人 ${bot.uin} 的头像换成 ${short(url)}`,
       run: async () => {
         await chat.invoke([[bot, 'setAvatar', [url]], [bot, 'sendApi', ['set_qq_avatar', { file: url }]]], '修改头像')
-        return `野生号 ${bot.uin} 的头像已更换`
+        return `其他协议机器人 ${bot.uin} 的头像已更换`
       }
     }
   },
@@ -86,12 +86,12 @@ const ACTIONS = {
     if (!nickname) return '请提供新昵称'
     if (nickname.length > 36) return '昵称太长了'
     const bot = chat.anyWild(e)
-    if (!bot) return '没有在线的野生号'
+    if (!bot) return '没有在线的其他协议机器人'
     return {
-      title: `把野生号 ${bot.uin} 的昵称改成「${nickname}」`,
+      title: `把其他协议机器人 ${bot.uin} 的昵称改成「${nickname}」`,
       run: async () => {
         await chat.invoke([[bot, 'setNickname', [nickname]], [bot, 'sendApi', ['set_qq_profile', { nickname }]]], '修改昵称')
-        return `野生号 ${bot.uin} 的昵称已改成「${nickname}」`
+        return `其他协议机器人 ${bot.uin} 的昵称已改成「${nickname}」`
       }
     }
   },
@@ -100,9 +100,9 @@ const ACTIONS = {
     const text = String(args.text ?? '').trim()
     if (text.length > 100) return '个性签名太长了，最多 100 字'
     const bot = chat.anyWild(e)
-    if (!bot) return '没有在线的野生号'
+    if (!bot) return '没有在线的其他协议机器人'
     return {
-      title: text ? `把野生号 ${bot.uin} 的个性签名改成「${short(text)}」` : `清空野生号 ${bot.uin} 的个性签名`,
+      title: text ? `把其他协议机器人 ${bot.uin} 的个性签名改成「${short(text)}」` : `清空其他协议机器人 ${bot.uin} 的个性签名`,
       run: async () => {
         // NapCat 用 set_self_longnick；go-cqhttp、LLOneBot 等没有这个接口，签名在 set_qq_profile 的 personal_note 里（要带上现在的昵称，免得被清空）
         const nickname = bot.nickname || (await chat.invoke([[bot, 'sendApi', ['get_login_info', {}]]], '查询昵称').catch(() => null))?.nickname
@@ -111,7 +111,7 @@ const ACTIONS = {
           [bot, 'sendApi', ['set_self_longnick', { longNick: text, long_nick: text }]],
           [bot, 'sendApi', ['set_qq_profile', { ...(nickname ? { nickname } : {}), personal_note: text }]]
         ], '修改个性签名')
-        return `野生号 ${bot.uin} 的个性签名已${text ? `改成「${text}」` : '清空'}`
+        return `其他协议机器人 ${bot.uin} 的个性签名已${text ? `改成「${text}」` : '清空'}`
       }
     }
   },
@@ -122,16 +122,16 @@ const ACTIONS = {
     const card = String(args.text ?? '').trim()
     if (card.length > 60) return '群名片太长了'
     const bot = chat.wildInGroup(gid)
-    if (!bot) return `野生号不在群 ${gid} 里`
+    if (!bot) return `其他协议机器人不在群 ${gid} 里`
     return {
-      title: card ? `把野生号 ${bot.uin} 在群 ${gid} 的群名片改成「${card}」` : `清空野生号 ${bot.uin} 在群 ${gid} 的群名片`,
+      title: card ? `把其他协议机器人 ${bot.uin} 在群 ${gid} 的群名片改成「${card}」` : `清空其他协议机器人 ${bot.uin} 在群 ${gid} 的群名片`,
       run: async () => {
         await chat.invoke([
           [bot.pickGroup(Number(gid)), 'setCard', [bot.uin, card]],
           [bot, 'setGroupCard', [Number(gid), bot.uin, card]],
           [bot, 'sendApi', ['set_group_card', { group_id: Number(gid), user_id: Number(bot.uin), card }]]
         ], '修改群名片')
-        return `野生号 ${bot.uin} 在群 ${gid} 的群名片已${card ? `改成「${card}」` : '清空'}`
+        return `其他协议机器人 ${bot.uin} 在群 ${gid} 的群名片已${card ? `改成「${card}」` : '清空'}`
       }
     }
   }
@@ -142,8 +142,8 @@ export class BotAccountTool extends CustomTool {
 
   function = {
     name: 'bot_account',
-    description: '管理机器人（野生号）自己的账号：退出某个群（quit_group）、删除好友（delete_friend）、换头像（set_avatar）、' +
-      '改昵称（set_nickname）、改个性签名（set_signature）、改自己在群里的群名片（set_card）。官方机器人做不了这些，都由野生号执行。' +
+    description: '管理用 QQ 号登录的机器人（其他协议机器人，如 OneBot / ICQQ）自己的账号：退出某个群（quit_group）、删除好友（delete_friend）、换头像（set_avatar）、' +
+      '改昵称（set_nickname）、改个性签名（set_signature）、改自己在群里的群名片（set_card）。官方机器人做不了这些，都由其他协议机器人执行。' +
       '主人要求时直接执行；其他人要求时会 @ 主人申请确认，主人确认后才执行（告诉用户等主人确认即可）。改群友的名片用 group_admin。',
     parameters: {
       type: 'object',

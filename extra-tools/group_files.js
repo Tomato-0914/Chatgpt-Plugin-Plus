@@ -40,7 +40,7 @@ function entries (ret, parent) {
 }
 
 /**
- * 野生号的群文件接口：ICQQ 用 group.fs；OneBot 直接调 OneBot 接口
+ * 其他协议机器人的群文件接口：ICQQ 用 group.fs；OneBot 直接调 OneBot 接口
  * TRSS 的 OneBotv11 也给群对象挂了 fs，但参数规则和 ICQQ 不同：ls 传了参数就按文件夹 ID 查（传 "/" 拿不到文件夹），
  * rm 只能删文件、还要 busid，所以 OneBot 除了上传都不走它；上传仍用它，它会先把网址 / Buffer 存成本地文件再交给协议端
  */
@@ -50,7 +50,7 @@ function fsOf (bot, gid) {
   const gfs = icqq ? group?.fs : null
   const api = (action, params = {}) => [bot, 'sendApi', [action, { group_id: Number(gid), ...params }]]
   const call = (calls, label) => chat.invoke(calls, label).catch(err => {
-    throw new Error(NO_PERMISSION.test(err.message) ? `野生号没有权限（${err.message}）：可能需要野生号是群管理员，或本群设置了仅管理员可上传` : err.message)
+    throw new Error(NO_PERMISSION.test(err.message) ? `其他协议机器人没有权限（${err.message}）：可能需要其他协议机器人是群管理员，或本群设置了仅管理员可上传` : err.message)
   })
   return {
     async ls (folder = ROOT) {
@@ -151,7 +151,7 @@ export class GroupFilesTool extends CustomTool {
 
   function = {
     name: 'group_files',
-    description: '管理当前群的群文件（需要同群的野生号）：查看文件列表（list，可指定文件夹）、按名字找文件（search）、获取下载链接（url）、查看空间用量（info）、' +
+    description: '管理当前群的群文件（需要同群的其他协议机器人）：查看文件列表（list，可指定文件夹）、按名字找文件（search）、获取下载链接（url）、查看空间用量（info）、' +
       '上传文件（upload，网址或工作目录里的文件）、删除（delete）、重命名（rename）、移动到文件夹（move）、新建文件夹（mkdir）、删除文件夹（rmdir）、重命名文件夹（rename_folder）。' +
       '同名文件有多个时：用 all_matches 一起删除 / 移动（keep_newest 保留最新的一个），或用 search 结果里的 ID 填进 name 指定其中一个。' +
       'QQ 群文件只有一层文件夹，文件夹不能移动。删除、重命名、移动、文件夹操作：主人、群主、管理员直接执行，其他人会 @ 主人申请确认（主人、群主、管理员都能确认）。',
@@ -206,7 +206,7 @@ export class GroupFilesTool extends CustomTool {
       const bot = grp.wildFor(e, gid)
       if (!bot) {
         if (action === 'upload') return await officialUpload(e, args)
-        return '这个群里没有野生号，官方机器人只能往群文件里发文件，查看和管理群文件需要野生号'
+        return '这个群里没有其他协议机器人，官方机器人只能往群文件里发文件，查看和管理群文件需要其他协议机器人'
       }
       const gfs = fsOf(bot, gid)
 
@@ -257,7 +257,7 @@ export class GroupFilesTool extends CustomTool {
           await gfs.upload(src.file, name, folder?.id || ROOT)
           return `已上传「${name}」到群文件${folder ? `的「${folder.name}」文件夹` : ''}`
         }
-        // 野生号是管理员时，群友能借它绕过“仅管理员可上传”的设置，这种情况普通群友上传要主人或群管确认
+        // 其他协议机器人是管理员时，群友能借它绕过“仅管理员可上传”的设置，这种情况普通群友上传要主人或群管确认
         if (!(await approval.isManager(e)) && await wildIsAdmin(bot, gid)) {
           return await approval.guard(e, { title: `上传「${name}」到群文件`, run, level: 'manager' })
         }
@@ -337,9 +337,9 @@ export class GroupFilesTool extends CustomTool {
   }
 }
 
-/** 没有野生号时：官方机器人把文件发到群里（会进群文件根目录） */
+/** 没有其他协议机器人时：官方机器人把文件发到群里（会进群文件根目录） */
 async function officialUpload (e, args) {
-  if (args.folder && args.folder !== '根目录') return '这个群里没有野生号，官方机器人只能把文件传到群文件根目录'
+  if (args.folder && args.folder !== '根目录') return '这个群里没有其他协议机器人，官方机器人只能把文件传到群文件根目录'
   const src = String(args.source ?? '').trim()
   if (!src) return '请提供要上传的文件：网址，或工作目录里的文件路径'
   const file = /^https?:\/\//i.test(src) ? src : ws.resolvePath(src)
