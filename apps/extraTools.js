@@ -42,6 +42,8 @@ function processorType (code) {
 const hash = code => crypto.createHash('md5').update(code).digest('hex')
 
 const loadApproval = () => import(pathToFileURL(path.join(TOOLS_DIR, '_approval.js')).href)
+/** 机器人黑名单（extra-tools/_blacklist.js），拦截要同步判断，加载时就读进来 */
+const blacklist = await import(pathToFileURL(path.join(TOOLS_DIR, '_blacklist.js')).href)
 
 /**
  * 把目录里的代码登记进 manager
@@ -170,6 +172,17 @@ export class ChatGPTExtraTools extends plugin {
           permission: 'master'
         },
         {
+          // 机器人黑名单：#chatgpt拉黑 QQ号 [分钟]、#chatgpt解除拉黑 QQ号、#chatgpt黑名单
+          reg: `^${ChatGPTConfig.basic.commandPrefix}(解除)?拉黑\\s*\\d{5,12}(\\s+\\d+)?$`,
+          fnc: 'blacklistSet',
+          permission: 'master'
+        },
+        {
+          reg: `^${ChatGPTConfig.basic.commandPrefix}黑名单$`,
+          fnc: 'blacklistList',
+          permission: 'master'
+        },
+        {
           // 风险工具由没有权限的人发起时，用这个确认或拒绝；按钮回调会带上申请编号。
           // 不设 permission：谁能处理由 _approval.js 判定（主人级只有主人，群管级还有本群群主、管理员），
           // 群友随口说 “y” 时不能回 “暂无权限”，没有权限或没有待确认的申请时直接放行
@@ -206,5 +219,55 @@ export class ChatGPTExtraTools extends plugin {
       await e.reply(`扩展工具同步失败：${err.message}`)
     }
     return true
+  }
+
+  async blacklistSet (e) {
+    const [, un, qq, mins] = e.msg.trim().match(/(解除)?拉黑\s*(\d{5,12})(?:\s+(\d+))?$/) || []
+    if (!qq) return false
+    if (un) {
+      const item = blacklist.remove([qq])
+      await e.reply(item ? `已解除拉黑：${blacklist.line(item)}` : `${qq} 不在黑名单里`)
+      return true
+    }
+    const approval = await loadApproval()
+    if (await approval.isMaster(e, qq) || [...(globalThis.Bot?.uin || [])].map(String).includes(qq)) {
+      await e.reply('不能拉黑主人或机器人自己')
+      return true
+    }
+    const item = blacklist.add([qq], { reason: '主人手动拉黑', by: `主人 ${e.user_id}`, minutes: Number(mins) || 0 })
+    await e.reply(`已拉黑：${blacklist.line(item)}`)
+    return true
+  }
+
+  async blacklistList (e) {
+    const list = blacklist.list()
+    await e.reply(list.length ? `机器人黑名单（${list.length} 人）：\n${list.map((i, n) => `${n + 1}. ${blacklist.line(i)}`).join('\n')}` : '机器人黑名单是空的')
+    return true
+  }
+}
+
+/**
+ * 机器人黑名单的拦截：优先级最高，被拉黑的人发的消息、戳一戳直接丢掉，所有插件都收不到。
+ * 主人不拦（_blacklist.js 的 blocked 判断）
+ */
+export class ChatGPTBlacklistMessage extends plugin {
+  constructor () {
+    super({ name: 'ChatGPT-Plugin黑名单', dsc: '被拉黑的人发的消息不处理', event: 'message', priority: -Infinity })
+  }
+
+  accept (e) {
+    if (!blacklist.blocked(e)) return false
+    logger.debug(`[黑名单] 忽略 ${e.user_id} 的消息`)
+    return 'return'
+  }
+}
+
+export class ChatGPTBlacklistNotice extends plugin {
+  constructor () {
+    super({ name: 'ChatGPT-Plugin黑名单（通知）', dsc: '被拉黑的人戳机器人不处理', event: 'notice', priority: -Infinity })
+  }
+
+  accept (e) {
+    return blacklist.blocked(e) ? 'return' : false
   }
 }
