@@ -222,14 +222,14 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 38 | `get_master_info` |  | 获取主人信息列表 | low |  |
 | 39 | `send_private_message` | `send_message`（private） | 发送私聊消息给指定用户。 | high | ✅ |
 | 40 | `send_group_message` | `send_message`（group） | 发送群消息 | high | ✅ |
-| 41 | `reply_current_message` |  | 回复当前会话消息（自动判断群聊/私聊） | high |  |
+| 41 | `reply_current_message` | `send_message`（reply） | 回复当前会话消息（自动判断群聊/私聊） | high | 🆕 |
 | 42 | `at_user` | `at_user` | 发送@用户消息。 | high | ✅ |
 | 43 | `at_role` |  | 按角色随机@群成员。 | high |  |
 | 44 | `random_at` | `send_message`（random_at） | 随机@群成员。 | high | ✅ |
 | 45 | `get_chat_history` | `search_chat_history` | 获取聊天历史记录。 | low | ✅ |
 | 46 | `recall_message` | `group_admin`（recall） | 撤回消息（仅限2分钟内的消息） | 危险 | ✅ |
 | 47 | `get_forward_msg` | `forward_msg` | 获取合并转发消息的完整内容。 | low | ✅ |
-| 48 | `deep_parse_message` |  | 深度解析消息内容。 | low |  |
+| 48 | `deep_parse_message` | `chat_context`（parse） | 深度解析消息内容。 | low | 🆕 |
 | 49 | `send_forward_msg` |  | 【统一】发送合并转发消息。 | high |  |
 | 50 | `resend_quoted_card` |  | 【推荐】重新发送引用消息中的卡片。 | high |  |
 | 51 | `mark_msg_as_read` |  | 标记消息为已读（NapCat扩展） | high |  |
@@ -238,10 +238,10 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 54 | `delete_essence_msg` | `essence`（remove） | 移除群精华消息 | 危险 | ✅ |
 | 55 | `poke_user` | `poke_user` | 戳一戳用户 | high | ✅ |
 | 56 | `set_msg_emoji_like` | `emoji_reaction` | 对消息发送表情回应（表情贴） | high | ✅ |
-| 57 | `get_msg` |  | 获取消息详情。 | low |  |
-| 58 | `send_raw_message` |  | 发送原始消息段数组。 | 危险 |  |
+| 57 | `get_msg` | `chat_context`（message） | 获取消息详情。 | low | 🆕 |
+| 58 | `send_raw_message` | `send_message`（raw） | 发送原始消息段数组。 | 危险 | 🆕 |
 | 59 | `send_card` |  | 【统一】发送卡片消息。 | high |  |
-| 60 | `send_markdown` |  | 发送Markdown消息（NapCat/TRSS支持） | high |  |
+| 60 | `send_markdown` | `send_message`（markdown=true） | 发送Markdown消息（NapCat/TRSS支持） | high | 🆕 |
 | 61 | `send_button` |  | 发送按钮消息（NapCat扩展） | high |  |
 | 62 | `call_api` |  | 直接调用Bot API（NapCat/OneBot扩展）。 | 危险 |  |
 | 63 | `send_long_msg` |  | 发送长消息（NapCat扩展）。 | high |  |
@@ -262,7 +262,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 78 | `get_sender_info` | `member_info` | 获取当前消息发送者的详细信息 | low | ✅ |
 | 79 | `search_friend` |  | 在好友列表中搜索用户（按昵称或备注） | low |  |
 | 80 | `check_is_friend` |  | 检查指定用户是否是机器人的好友 | low |  |
-| 81 | `get_bot_info` |  | 获取机器人自身的信息 | low |  |
+| 81 | `get_bot_info` | `system_info`（bots） | 获取机器人自身的信息 | low | 🆕 |
 | 82 | `get_user_profile` | `user_profile` | 获取用户的详细资料（包括签名、等级等） | low | ✅ |
 | 83 | `get_group_info` | `group_info`（info） | 获取群组的基本信息，包括群名、成员数量等。 | low | ✅ |
 | 84 | `get_group_list` | `group_info`（list） | 获取机器人加入的群列表 | low | ✅ |
@@ -315,7 +315,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 131 | `set_msg_reaction` | `emoji_reaction` | 对消息添加表情回应（贴表情），可从聊天记录的[消息ID:xxx]获取message_id | high | ✅ |
 | 132 | `search_wallpaper` | `search_image`（wallpaper） | 搜索壁纸图片 | high | ✅ |
 | 133 | `bilibili_search` | `bilibili`（search） | 搜索B站视频并发送结果 | high | ✅ |
-| 134 | `github_repo_info` |  | 获取GitHub仓库的详细信息 | low |  |
+| 134 | `github_repo_info` | `github_repo` | 获取GitHub仓库的详细信息 | low | 🆕 |
 | 135 | `ai_image_edit` |  | 使用AI编辑图片，使用框架配置的图片模型 | high |  |
 | 136 | `bilibili_video_summary` |  | 获取B站视频的AI总结，包含视频摘要、大纲和精选弹幕 | low |  |
 | 137 | `video_analysis` | `file_read`（截取画面交给 look_at_image） | 分析视频内容，支持从消息中获取视频或提供视频URL，使用智谱AI进行视频理解 | low | 🆕 |
@@ -433,13 +433,13 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 249 | `create_collection` |  | 创建QQ收藏（将内容添加到QQ收藏夹） | high |  |
 | 250 | `get_collection_list` |  | 获取QQ收藏列表 | low |  |
 | 251 | `get_login_info` |  | 获取机器人登录账号的信息（QQ号、昵称等） | low |  |
-| 252 | `get_bot_status` |  | 获取机器人运行状态 | low |  |
+| 252 | `get_bot_status` | `system_info`（bots） | 获取机器人运行状态 | low | 🆕 |
 | 253 | `get_stranger_info` | `user_profile` | 获取陌生人信息 | low | ✅ |
-| 254 | `get_version_info` |  | 获取机器人版本信息 | low |  |
-| 255 | `get_online_clients` |  | 获取当前账号在线客户端列表 | low |  |
+| 254 | `get_version_info` | `system_info`（env、bots） | 获取机器人版本信息 | low | 🆕 |
+| 255 | `get_online_clients` | `system_info`（clients） | 获取当前账号在线客户端列表 | low | 🆕 |
 | 256 | `set_qq_avatar` | `bot_account`（set_avatar） | 设置机器人头像（危险操作） | 危险 | ✅ |
 | 257 | `get_model_show` |  | 获取机型显示信息 | low |  |
-| 258 | `get_self_info` |  | 获取机器人自身的完整信息（综合） | low |  |
+| 258 | `get_self_info` | `system_info`（bots） | 获取机器人自身的完整信息（综合） | low | 🆕 |
 | 259 | `list_skills` | ikechan 内置 Skill | 列出所有可用的技能(skills)及其描述。 | low |  |
 | 260 | `load_skill` | ikechan 内置 Skill | 读取指定技能的完整指令并在当前工具调用链中生效。 | low |  |
 | 261 | `get_skill_info` | ikechan 内置 Skill | 获取指定技能的说明，包括正文指令、触发词、允许/禁止的工具列表，以及该技能包内可供读取的附… | low |  |
@@ -474,7 +474,7 @@ XxxX 版（XxxXTeam/chatgpt-plugin）`src/mcp/tools` 里的全部工具，与本
 | 290 | `execute_command` | `shell` | 执行 Shell 命令。 | 危险 | ✅ |
 | 291 | `get_system_info` | `shell` | 获取系统信息，包括操作系统、CPU、内存、磁盘等 | low | ✅ |
 | 292 | `get_process_info` | `shell` | 获取当前 Node.js 进程信息 | low | ✅ |
-| 293 | `read_env` |  | 读取环境变量 | 危险 |  |
+| 293 | `read_env` | `system_info`（env_vars，仅主人） | 读取环境变量 | 危险 | 🆕 |
 | 294 | `yunzai_command` | `yunzai_command` | 按当前触发者权限搜索并执行 Yunzai 已加载的插件命令。 | high | ✅ |
 | 295 | | `file_edit` | 按原文替换修改文本文件的一部分（框架文件修改前自动备份） | high | ✅ |
 | 296 | | `file_restore` | 查看、还原框架文件的备份（仅主人） | high | ✅ |

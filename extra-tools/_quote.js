@@ -72,7 +72,7 @@ function replyIdOf (msg) {
 }
 
 /** 按消息 ID 取消息：群对象 / 机器人的 getMsg（官方机器人从 QQBot-Plugin 的消息记录取） */
-async function getMsg (bot, gid, id) {
+export async function getMsg (bot, gid, id) {
   if (id === undefined || id === null || id === '') return null
   for (const fn of [() => gid && bot?.pickGroup?.(chat.asId(gid))?.getMsg?.(id), () => bot?.getMsg?.(id)]) {
     try {
@@ -121,4 +121,55 @@ export async function replyText (e, depth, { readable = false } = {}) {
     cur = next
   }
   return lines.join('\n')
+}
+
+/* ---------- 逐段解析（chat_context 的 parse / message） ---------- */
+
+const short = (v, n = 300) => {
+  const t = String(v ?? '').replace(/\s+/g, ' ').trim()
+  return t.length > n ? `${t.slice(0, n)}…` : t
+}
+const sizeText = n => (Number(n) > 0 ? (n < 1048576 ? `${(n / 1024).toFixed(1)}KB` : `${(n / 1048576).toFixed(1)}MB`) : '')
+
+/** 卡片（json）里有用的字段：小程序 / 分享卡片的标题、简介、跳转地址；合并转发的 resid */
+function cardDetail (data) {
+  let json = data
+  try { if (typeof json === 'string') json = JSON.parse(json) } catch { return `卡片（解析不了）：${short(data, 200)}` }
+  if (json?.app === 'com.tencent.multimsg') return `合并转发卡片（resid：${json.meta?.detail?.resid || '无'}，用 forward_msg 读取）：${short(json.meta?.detail?.news?.map(n => n.text).join(' / '), 120)}`
+  const meta = Object.values(json?.meta || {})[0] || {}
+  const url = meta.qqdocurl || meta.jumpUrl || meta.url || ''
+  return `卡片（${json?.app || '未知'}）：${[json?.prompt, meta.title, meta.desc].filter(Boolean).map(x => short(x, 120)).join(' | ')}${url ? `，链接：${url}` : ''}`
+}
+
+/** 一条消息逐段列出来：文字、@、图片地址、文件名和大小、卡片标题和链接、合并转发编号等 */
+export function detailOf (msg) {
+  const segs = Array.isArray(msg?.message) ? msg.message : null
+  if (!segs) return [`（只有文字记录）${short(msg?.raw_message ?? msg?.message ?? '', 500)}`]
+  return segs.map((seg, i) => {
+    if (!seg || typeof seg !== 'object') return `${i + 1}. 文字：${short(seg)}`
+    const d = seg.data && typeof seg.data === 'object' ? { ...seg, ...seg.data } : seg
+    const n = `${i + 1}. `
+    switch (seg.type) {
+      case 'text': return `${n}文字：${short(d.text, 500)}`
+      case 'at': return `${n}@ ${d.text?.replace(/^@/, '') || d.name || ''}（${d.qq}）`
+      case 'reply': return `${n}引用了消息（ID：${d.id ?? ''}）`
+      case 'image': return `${n}图片：${d.url || d.file || ''}${d.summary && d.summary !== '[图片]' ? `（${d.summary}）` : ''}${sizeText(d.file_size) ? `，${sizeText(d.file_size)}` : ''}`
+      case 'face': case 'mface': case 'bface': return `${n}表情：${d.summary || d.text || d.id || ''}`
+      case 'record': return `${n}语音：${d.url || d.file || ''}（用 file_read 读取时长等信息）`
+      case 'video': return `${n}视频：${d.url || d.file || ''}（用 file_read 读取信息和画面）`
+      case 'file': return `${n}文件：${d.name || d.file || ''}${sizeText(d.size || d.file_size) ? `，${sizeText(d.size || d.file_size)}` : ''}${d.fid || d.file_id ? `，ID：${d.fid || d.file_id}` : ''}（用 file_read 读取内容）`
+      case 'json': return `${n}${cardDetail(d.data ?? seg.data)}`
+      case 'xml': return `${n}XML 卡片：${short(d.data ?? seg.data, 200)}`
+      case 'forward': case 'node': return `${n}合并转发（ID：${d.id || d.resid || ''}，用 forward_msg 读取）`
+      case 'markdown': return `${n}Markdown：${short(d.content ?? d.data, 500)}`
+      case 'button': return `${n}按钮`
+      default: return `${n}${seg.type}：${short(JSON.stringify(d), 200)}`
+    }
+  })
+}
+
+/** 消息头：发送人、时间、消息 ID */
+export function headOf (e, msg) {
+  const id = msg?.message_id ?? msg?.seq ?? ''
+  return `${senderOf(e, msg)}${time(msg?.time) ? `，${time(msg.time)}` : ''}${id !== '' ? `，消息 ID：${id}` : ''}`
 }
