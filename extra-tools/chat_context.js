@@ -146,14 +146,16 @@ export class ChatContextTool extends CustomTool {
       '读取被引用的消息（reply：用户引用 / 回复了一条消息而你看不到它的文字时用，会带上发送人、时间，以及它引用的消息）；' +
       '@ 列表（at：这条消息 @ 了哪些人，带 QQ 号、群名片和身份，踢人、禁言等需要 QQ 号时用）；' +
       '对话详情（conversation：用的预设和模型、这次对话聊了几轮、群聊上下文和记忆是否开启）；' +
+      '按消息 ID 查一条消息（message）；逐段解析一条消息（parse：图片地址、文件名和大小、卡片标题和链接、合并转发编号等，不填 message_id 时解析被引用的消息）；' +
       '结束对话（clear：用户要求“忘掉之前的对话 / 重新开始 / 结束对话”时用，等同 #结束对话）。',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['current', 'reply', 'at', 'conversation', 'clear'],
-          description: 'current=当前会话（默认），reply=被引用的消息，at=@ 列表，conversation=对话详情，clear=结束当前对话'
+          enum: ['current', 'reply', 'at', 'conversation', 'clear', 'message', 'parse'],
+          description: 'current=当前会话（默认），reply=被引用的消息，at=@ 列表，conversation=对话详情，clear=结束当前对话，' +
+            'message=按消息 ID 查一条消息，parse=逐段解析一条消息（图片地址、文件、卡片链接、合并转发编号等）'
         },
         depth: {
           type: 'number',
@@ -162,6 +164,10 @@ export class ChatContextTool extends CustomTool {
         user_id: {
           type: 'string',
           description: 'clear 时结束谁的对话，默认说话的人；只有主人可以结束别人的对话'
+        },
+        message_id: {
+          type: 'string',
+          description: 'message 时要查的消息 ID（必填）；parse 时要解析的消息 ID，不填时解析被引用的消息，没有引用时解析当前这条'
         }
       },
       required: []
@@ -183,6 +189,26 @@ export class ChatContextTool extends CustomTool {
         }
         case 'conversation':
           return await conversation(e)
+        case 'message':
+        case 'parse': {
+          const id = String(args.message_id ?? '').trim()
+          if (args.action === 'message' && !id) return '请提供消息 ID'
+          let m
+          if (id) {
+            // 当前机器人查不到（如官方机器人没收到）时用同群的其他协议机器人查
+            const wild = chat.isWildBot(e.bot) ? null : chat.wildInGroup(e.group_id)
+            m = await quote.getMsg(e.bot, e.group_id, id) || (wild && await quote.getMsg(wild, e.group_id, id))
+            if (!m) return `没有找到消息 ${id}（可能太早了，或机器人没收到）`
+          } else if (e.source || e.reply_id) {
+            m = await quote.quoted(e)
+            if (!m) return '这条消息引用了别的消息，但没有取到内容'
+          } else {
+            m = e
+          }
+          const title = id ? `消息 ${id}` : m === e ? '当前这条消息' : '被引用的消息'
+          if (args.action === 'message') return `${quote.headOf(e, m)}\n${quote.contentOf(m)}`
+          return `${title}：${quote.headOf(e, m)}\n${quote.detailOf(m).join('\n')}`
+        }
         case 'clear': {
           const self = String(e.sender?.user_id ?? e.user_id)
           const uid = String(args.user_id ?? '').replace(/^@/, '').trim() || self

@@ -60,11 +60,26 @@ async function sendGroup (e, gid, msg) {
   return await trySend(attempts)
 }
 
-function build (text, image) {
+const isOfficial = bot => bot?.adapter?.id === 'QQBot'
+
+/** 消息：文字（markdown 为 true 且是官方机器人时发 Markdown，其他机器人发普通文字）+ 图片 */
+function build (text, image, { markdown = false, bot } = {}) {
   const msg = []
-  if (text) msg.push(text)
+  if (text) msg.push(markdown && isOfficial(bot) ? { type: 'markdown', data: text } : text)
   if (image) msg.push({ type: 'image', file: image })
   return msg
+}
+
+/** OneBot 写法 { type, data: {...} } 和云崽写法 { type, ...字段 } 都认，统一成云崽写法 */
+function normalizeSegments (list) {
+  if (!Array.isArray(list) || !list.length) throw new Error('segments 要是消息段数组，如 [{"type":"text","text":"你好"}]')
+  if (list.length > 20) throw new Error('消息段最多 20 个')
+  return list.map(seg => {
+    if (typeof seg === 'string') return seg
+    if (!seg || typeof seg !== 'object' || !seg.type) throw new Error('每个消息段都要有 type')
+    const { type, data, ...rest } = seg
+    return data && typeof data === 'object' && !Array.isArray(data) ? { type, ...data, ...rest } : { type, ...(data !== undefined ? { data } : {}), ...rest }
+  })
 }
 
 /** 不重复地随机取 n 个 */
@@ -75,6 +90,26 @@ function sample (list, n) {
     ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy.slice(0, n)
+}
+
+/**
+ * 发原始消息段（主人级：消息段可以拼出各种卡片、伪造转发等，只有主人能直接发，别人要主人确认）
+ * 发到 group_id / user_id，都不填时发到当前聊天
+ */
+async function raw (e, args) {
+  const msg = normalizeSegments(args.segments)
+  const gid = String(args.group_id ?? '').trim()
+  const uid = String(args.user_id ?? '').trim()
+  const types = [...new Set(msg.map(m => (typeof m === 'string' ? 'text' : m.type)))].join('、')
+  const target = gid ? `群 ${gid}` : uid ? `私聊 ${uid}` : '当前聊天'
+  const run = async () => {
+    if (gid) return `已发到群 ${gid}（${await sendGroup(e, gid, msg)}）`
+    if (uid) return `已私聊发给 ${uid}（${await sendPrivate(e, uid, msg)}）`
+    const ret = await e.reply(msg)
+    if (!chat.sent(ret)) throw new Error(chat.failReason(ret))
+    return '已经发到当前聊天，不需要再重复发送'
+  }
+  return await approval.guard(e, { title: `往${target}发原始消息段（${types}）`, run })
 }
 
 async function toMaster (e, text, image, all) {
@@ -130,16 +165,17 @@ export class SendMessageTool extends CustomTool {
 
   function = {
     name: 'send_message',
-    description: '替用户发消息：私聊转告主人（to_master）、私聊发给某人（private）、发到某个群（group）、在当前群随机 @ 几个人（random_at）。' +
-      '在当前聊天里回复不需要用这个工具，直接回答即可；在群里 @ 指定的人用 at_user。' +
-      '群友让机器人私聊别人、或往别的群发消息时，需要主人确认后才会发出。',
+    description: '替用户发消息：私聊转告主人（to_master）、私聊发给某人（private）、发到某个群（group）、在当前群随机 @ 几个人（random_at）、' +
+      '在当前聊天里先发一条（reply，可 @ 说话的人、引用原消息；一轮里要先回一句再继续用工具时用，平时直接回答即可）、发原始消息段（raw，主人级）。' +
+      'markdown=true 时文字按 Markdown 发（只有官方机器人支持，其他机器人按普通文字发）。在群里 @ 指定的人用 at_user。' +
+      '群友让机器人私聊别人、或往别的群发消息、发原始消息段时，需要主人确认后才会发出。',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['to_master', 'private', 'group', 'random_at'],
-          description: 'to_master=转告主人（默认）；private=私聊某人；group=发到某个群；random_at=当前群随机 @ 人'
+          enum: ['to_master', 'private', 'group', 'random_at', 'reply', 'raw'],
+          description: 'to_master=转告主人（默认）；private=私聊某人；group=发到某个群；random_at=当前群随机 @ 人；reply=在当前聊天先发一条；raw=发原始消息段'
         },
         text: {
           type: 'string',
@@ -172,6 +208,23 @@ export class SendMessageTool extends CustomTool {
         exclude_self: {
           type: 'boolean',
           description: 'action=random_at 时排除说话的人自己'
+        },
+        markdown: {
+          type: 'boolean',
+          description: 'reply / group（当前群）时文字按 Markdown 发，只有官方机器人支持'
+        },
+        at_sender: {
+          type: 'boolean',
+          description: 'action=reply 时在群里 @ 说话的人'
+        },
+        quote: {
+          type: 'boolean',
+          description: 'action=reply 时引用说话的人这条消息'
+        },
+        segments: {
+          type: 'array',
+          description: 'action=raw 时的消息段数组，如 [{"type":"text","text":"你好"},{"type":"image","file":"https://..."}]，也认 OneBot 的 {"type","data"} 写法；最多 20 个',
+          items: { type: 'object' }
         }
       },
       required: []
@@ -183,12 +236,23 @@ export class SendMessageTool extends CustomTool {
     if (!e) return '拿不到当前消息'
     try {
       if (args.action === 'random_at') return await random(e, args)
+      if (args.action === 'raw') return await raw(e, args)
 
       const text = String(args.text ?? '').trim()
       if (text.length > MAX_TEXT) return `内容太长了，最多 ${MAX_TEXT} 字`
       const image = String(args.image_url ?? '').trim()
       if (image && !/^https?:\/\//i.test(image)) return '图片地址只支持 http / https'
       if (!text && !image) return '请提供要发的内容'
+
+      const markdown = args.markdown === true
+      if (args.action === 'reply') {
+        // 在当前聊天里回一条（可 @ 说话的人、引用原消息）：一轮对话里要先发一句、再继续用别的工具时用
+        const msg = build(text, image, { markdown, bot: e.bot })
+        if (args.at_sender && (e.isGroup || e.group_id)) msg.unshift({ type: 'at', qq: chat.asId(e.user_id) }, ' ')
+        const ret = await e.reply(msg, args.quote === true)
+        if (!chat.sent(ret)) return `发送失败：${chat.failReason(ret)}`
+        return `已经发到当前聊天${markdown && !isOfficial(e.bot) ? '（当前不是官方机器人，按普通文字发送）' : ''}，不需要再重复发送`
+      }
 
       if (args.action === 'private') {
         const uid = chat.targetUser(e, args.user_id)
@@ -204,7 +268,7 @@ export class SendMessageTool extends CustomTool {
         const gid = String(args.group_id ?? '').trim() || current
         if (!gid) return '请提供群号'
         if (gid === current) {
-          const ret = await e.reply(build(text, image))
+          const ret = await e.reply(build(text, image, { markdown, bot: e.bot }))
           return chat.sent(ret) ? '已经发到当前群，不需要再重复发送' : `发送失败：${chat.failReason(ret)}`
         }
         if (!isQQ(gid)) return `群号格式不对：${gid}`
