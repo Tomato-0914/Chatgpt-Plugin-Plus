@@ -256,6 +256,11 @@ import(pathToFileURL(path.join(TOOLS_DIR, '_reminders.js')).href)
   .then(reminders => reminders.start())
   .catch(err => logger.error('[扩展工具] 提醒启动失败', err))
 
+// 启动临时拉黑的到期检查（extra-tools/_blacklist.js），重启前拉黑的人到时间照样解除
+import(pathToFileURL(path.join(TOOLS_DIR, '_blacklist.js')).href)
+  .then(blacklist => blacklist.start())
+  .catch(err => logger.error('[扩展工具] 临时拉黑检查启动失败', err))
+
 // 启动时等 chaite 初始化完成后同步一次
 ;(async () => {
   for (let i = 0; i < 60; i++) {
