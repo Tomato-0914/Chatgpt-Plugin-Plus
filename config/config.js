@@ -262,6 +262,35 @@ class ChatGPTConfig {
   }
 
   /**
+   * AI 回复的 Markdown 渲染成图片（utils/markdown_image.js）
+   * @type {{
+   *   enable: boolean,
+   *   scope: 'unofficial' | 'all',
+   *   mode: 'auto' | 'always',
+   *   longText: number,
+   *   maxLength: number,
+   *   width: number,
+   *   theme: 'light' | 'dark'
+   * }}
+   */
+  markdownImage = {
+    // 开关。需要依赖 markdown-it、highlight.js（插件目录 pnpm install），缺依赖时按文字发送
+    enable: true,
+    // 哪些机器人渲染：'unofficial' 只在 ICQQ / OneBot 等非官方机器人上渲染；'all' 官方机器人也渲染
+    scope: 'unofficial',
+    // 'auto'：回复里有代码块、标题、表格，或较长的回复里有加粗、列表、引用时才渲染；'always'：所有文字回复都渲染
+    mode: 'auto',
+    // 回复达到这么多字时，没有 Markdown 写法也渲染，0 表示不按字数
+    longText: 0,
+    // 超过这么多字不渲染，按文字发送
+    maxLength: 10000,
+    // 图片内容宽度（px，320～1600）。窄一些在手机上字更大
+    width: 640,
+    // 主题：'light' 浅色 / 'dark' 深色
+    theme: 'light'
+  }
+
+  /**
    * 视觉/图片处理配置
    * @type {{
    *   nonVisionStrategy: 'tool' | 'ignore',

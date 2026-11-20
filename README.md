@@ -121,6 +121,28 @@ memory:
   ```
 - `#chatgpt调试模式开关`、`#chatgpt伪人开关` 等指令可快速切换全局开关。
 
+### 回复渲染成图片
+
+ICQQ / OneBot 等非官方机器人发不了 Markdown，AI 回复里的 `**加粗**`、`## 标题`、表格、代码块会原样显示。插件会把这类回复渲染成图片发送（`utils/markdown_image.js`）：
+
+- 回复里有代码块、标题、表格，或较长的回复里有加粗、列表、引用时才渲染，普通聊天照常发文字
+- 代码高亮、表格、引用、任务列表都有样式；太长时按段落切成几张图（最多 8 张），超过 `maxLength` 字按文字发送
+- 渲染借用云崽的浏览器，不联网：Markdown 里的图片显示成占位文字，链接显示文字和网址
+- 需要依赖 `markdown-it`、`highlight.js`：更新插件后在插件目录执行一次 `pnpm install` 再重启；缺依赖或渲染失败时按文字发送
+- 伪人模式的回复不渲染
+
+配置在 `markdownImage` 下：
+
+| 配置 | 默认 | 说明 |
+| --- | --- | --- |
+| `enable` | `true` | 开关 |
+| `scope` | `unofficial` | `unofficial` 只在非官方机器人上渲染；`all` 官方机器人也渲染 |
+| `mode` | `auto` | `auto` 有 Markdown 写法才渲染；`always` 所有文字回复都渲染 |
+| `longText` | `0` | 回复达到这么多字时没有 Markdown 写法也渲染，0 表示不按字数 |
+| `maxLength` | `10000` | 超过这么多字不渲染，按文字发送 |
+| `width` | `640` | 图片内容宽度（px，320～1600），窄一些在手机上字更大 |
+| `theme` | `light` | `light` 浅色 / `dark` 深色 |
+
 ### 伪人（BYM）模式
 
 1. 在配置中启用 `bym.enable` 并指定 `defaultPreset` 或 `presetMap`。

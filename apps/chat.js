@@ -1,6 +1,7 @@
 import Config from '../config/config.js'
 import { Chaite, SendMessageOption } from 'chaite'
 import { getPreset, intoUserMessage, toYunzai } from '../utils/message.js'
+import { renderMarkdownReplies } from '../utils/markdown_image.js'
 import { YunzaiUserState } from '../models/chaite/user_state.js'
 import { buildGroupContextMessages, getGroupHistory, loadGroupContextImages } from '../utils/group.js'
 import { buildMemoryPrompt } from '../models/memory/prompt.js'
@@ -59,7 +60,8 @@ export class Chat extends plugin {
     }
     const sendMessageOptions = SendMessageOption.create(state?.settings)
     sendMessageOptions.onMessageWithToolCall = async content => {
-      const { msgs, forward } = await toYunzai(e, [content])
+      const { msgs: raw, forward } = await toYunzai(e, [content])
+      const msgs = await renderMarkdownReplies(e, raw, Config.markdownImage)
       if (msgs.length > 0) {
         await e.reply(msgs)
       }
@@ -202,7 +204,9 @@ export class Chat extends plugin {
       })
     }
     await Chaite.getInstance().getUserStateStorage().setItem(e.sender.user_id + '', state)
-    const { msgs, forward } = await toYunzai(e, response.contents)
+    const { msgs: raw, forward } = await toYunzai(e, response.contents)
+    // 非官方机器人发不了 Markdown：有 Markdown 写法的回复渲染成图片
+    const msgs = await renderMarkdownReplies(e, raw, Config.markdownImage)
     if (msgs.length > 0) {
       await e.reply(msgs, true)
     }
